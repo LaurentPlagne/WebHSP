@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <title>Hydro Valley Visualizer & Computer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         /* Ensure body and html take full height */
         html, body {
@@ -78,15 +77,9 @@
                 </article>
                 <article>
                     <hgroup>
-                        <h2>Computation Result</h2>
+                        <h2>Computation Status</h2>
                     </hgroup>
                     <pre><code id="result-output">...</code></pre>
-                </article>
-                <article>
-                    <hgroup>
-                        <h2>Reservoir Volume Simulation</h2>
-                    </hgroup>
-                    <div id="results-plot"></div>
                 </article>
             </div>
 
@@ -106,7 +99,6 @@
         const jsonInput = document.getElementById('json-input');
         const computeBtn = document.getElementById('compute-btn');
         const resultOutput = document.getElementById('result-output');
-        const resultsPlotDiv = document.getElementById('results-plot');
         const networkContainer = document.getElementById('network-graph');
         const themeSwitcher = document.getElementById('theme-switcher');
         const htmlElement = document.documentElement;
@@ -114,25 +106,48 @@
         // --- Vis.js Network Setup ---
         let network = null;
         const options = {
-            layout: {
-                hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed' }
+            physics: {
+                solver: 'barnesHut',
+                barnesHut: {
+                    gravitationalConstant: -8000,
+                    springConstant: 0.04,
+                    springLength: 150
+                }
             },
-            physics: { enabled: false },
-            edges: { smooth: true, arrows: 'to' }
+            edges: {
+                arrows: 'to'
+            }
         };
 
         function drawNetwork(valleyData) {
             try {
-                const nodes = new vis.DataSet(valleyData.reservoirs.map(r => ({
-                    id: r.name, label: r.name, shape: 'box', color: '#97C2FC'
-                })));
+                const nodes = new vis.DataSet();
+                const edges = new vis.DataSet();
 
-                const edges = new vis.DataSet(valleyData.units.map(u => ({
-                    from: u.upstream_reservoir, to: u.downstream_reservoir,
-                    label: `${u.name} (${u.type})`,
-                    color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
-                    font: { align: 'top' }
-                })));
+                // Add reservoir nodes (V-shape)
+                valleyData.reservoirs.forEach(r => {
+                    nodes.add({
+                        id: r.name,
+                        label: r.name,
+                        shape: 'triangleDown',
+                        color: '#1E90FF' // DodgerBlue
+                    });
+                });
+
+                // Add unit nodes (circles) and connect them with edges
+                valleyData.units.forEach(u => {
+                    nodes.add({
+                        id: u.name,
+                        label: u.name,
+                        shape: 'dot',
+                        size: 20,
+                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336' // Green for turbine, red for pump
+                    });
+                    // Edge from upstream reservoir to unit
+                    edges.add({ from: u.upstream_reservoir, to: u.name });
+                    // Edge from unit to downstream reservoir
+                    edges.add({ from: u.name, to: u.downstream_reservoir });
+                });
 
                 const data = { nodes: nodes, edges: edges };
                 if (network === null) {
@@ -159,11 +174,9 @@
 
         computeBtn.addEventListener('click', async () => {
             resultOutput.textContent = 'Running simulation...';
-            Plotly.purge(resultsPlotDiv); // Clear previous plot
             try {
                 const valleyData = JSON.parse(jsonInput.value);
 
-                // Note: The Python backend will need to proxy to /run_simulation
                 const response = await fetch('/api/run_simulation', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -175,25 +188,10 @@
                 }
 
                 const result = await response.json();
-                resultOutput.textContent = 'Simulation complete.';
 
-                const plotData = Object.keys(result).map(reservoirName => ({
-                    x: Array.from({length: result[reservoirName].length}, (_, i) => i), // Timesteps 0, 1, 2...
-                    y: result[reservoirName],
-                    mode: 'lines+markers',
-                    name: reservoirName
-                }));
-
-                const plotLayout = {
-                    title: 'Reservoir Volume Simulation',
-                    xaxis: { title: 'Time Step (hour)' },
-                    yaxis: { title: 'Volume (Million m³)' },
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: { color: 'var(--pico-contrast)' }
-                };
-
-                Plotly.newPlot(resultsPlotDiv, plotData, plotLayout);
+                // Save results to session storage and redirect
+                sessionStorage.setItem('simulationResults', JSON.stringify(result));
+                window.location.href = 'results.html';
 
             } catch (e) {
                 resultOutput.textContent = `Error: ${e.message}`;

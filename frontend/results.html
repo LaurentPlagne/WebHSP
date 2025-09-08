@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <title>Simulation Results - Hydro Valley</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            padding: var(--pico-spacing);
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <hgroup>
+            <h1>Simulation Results</h1>
+            <h2>Reservoir Volumes Over Time</h2>
+        </hgroup>
+        <div id="results-plot" style="min-height: 80vh;"></div>
+        <a href="index.html" role="button" class="secondary">Back to Main Page</a>
+    </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Apply theme from localStorage
+            const htmlElement = document.documentElement;
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            htmlElement.setAttribute('data-theme', savedTheme);
+
+            // Get data from sessionStorage
+            const resultsDataString = sessionStorage.getItem('simulationResults');
+            if (resultsDataString) {
+                const result = JSON.parse(resultsDataString);
+
+                const plotData = Object.keys(result).map(reservoirName => ({
+                    x: Array.from({length: result[reservoirName].length}, (_, i) => i),
+                    y: result[reservoirName],
+                    mode: 'lines+markers',
+                    name: reservoirName
+                }));
+
+                const plotLayout = {
+                    title: 'Reservoir Volume Simulation',
+                    xaxis: { title: 'Time Step (hour)' },
+                    yaxis: { title: 'Volume (Million m³)' },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: { color: 'var(--pico-contrast)' }
+                };
+
+                Plotly.newPlot('results-plot', plotData, plotLayout);
+            } else {
+                // Handle case where no data is found
+                const plotDiv = document.getElementById('results-plot');
+                plotDiv.innerHTML = '<p>No simulation data found. Please <a href="index.html">go back and run a simulation</a>.</p>';
+            }
+        });
+    </script>
+</body>
+</html>
