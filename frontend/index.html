@@ -8,16 +8,45 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        /* Make the main grid expand to fill vertical space */
-        main.container .grid {
-            grid-template-columns: 1fr 1.5fr; /* Give more space to the graph */
+        /* Ensure body and html take full height */
+        html, body {
+            height: 100%;
+            margin: 0;
         }
+        /* Make body a flex container to push main content down */
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        /* Make the main content area grow to fill available space */
+        main.container {
+            flex-grow: 1;
+            display: flex; /* Use flexbox for the main container as well */
+            flex-direction: column;
+        }
+        main.container > .grid {
+            flex-grow: 1; /* Make the grid fill the main container */
+            grid-template-columns: 1fr 1.5fr;
+            gap: var(--pico-spacing);
+        }
+        /* Make the articles within the grid columns stretch */
+        .grid > div, .grid > div > article {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Make the graph container fill its parent article */
         #network-graph {
-            height: 80vh; /* Make graph tall */
+            flex-grow: 1; /* Grow to fill the article */
             border: 1px solid var(--pico-muted-border-color);
         }
+        /* Give the results plot a larger, fixed size */
         #results-plot {
-            min-height: 400px; /* Give the results plot a default size */
+            min-height: 450px;
+        }
+        /* Make the JSON textarea taller */
+        #json-input {
+            flex-grow: 1;
         }
     </style>
 </head>
