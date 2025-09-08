@@ -27,20 +27,15 @@ pip install -r backend/requirements.txt
 
 **B. Setup the Julia Backend**
 
-The Julia server requires the `HTTP` and `JSON` packages. You can install them using the Julia package manager.
+The Julia server dependencies are managed by a `Project.toml` file. To install them, navigate to the `julia_server` directory and use the Julia package manager to instantiate the environment.
 
-First, start the Julia REPL:
 ```bash
-julia
+cd julia_server
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+cd ..
 ```
 
-Then, in the Julia REPL, press `]` to enter Pkg mode and run:
-```julia
-pkg> add HTTP JSON
-```
-Press backspace to exit Pkg mode, and then exit the REPL.
-
-*(Note: The `install-julia.sh` script in the repository might provide an automated way to install Julia itself if you don't have it.)*
+This command will download and install the exact versions of the packages required for this project (`HTTP.jl` and `JSON.jl`).
 
 ### 3. Running the Servers
 
@@ -48,9 +43,9 @@ You need to run both servers simultaneously in separate terminal windows.
 
 **A. Start the Julia Server**
 
-In your first terminal, run:
+In your first terminal, run the server from the root directory, activating its project environment:
 ```bash
-julia julia_server/server.jl
+julia --project=julia_server julia_server/server.jl
 ```
 You should see the message: `Starting Julia server on http://127.0.0.1:8081`
 
