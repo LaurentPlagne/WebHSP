@@ -1,0 +1,54 @@
+{
+  "problem_name": "My Hydro Valley",
+  "time_horizon": {
+    "timestep_hours": 1,
+    "num_timesteps": 4
+  },
+  "reservoirs": [
+    {
+      "name": "Reservoir_A",
+      "min_volume_M_m3": [100, 100, 98, 95],
+      "max_volume_M_m3": [500, 500, 498, 495]
+    },
+    {
+      "name": "Reservoir_B",
+      "min_volume_M_m3": [50, 50, 50, 50],
+      "max_volume_M_m3": [200, 200, 200, 200]
+    },
+    {
+      "name": "Reservoir_C",
+      "min_volume_M_m3": [20, 20, 20, 20],
+      "max_volume_M_m3": [100, 100, 100, 100]
+    }
+  ],
+  "units": [
+    {
+      "name": "Turbine_A_B",
+      "type": "turbine",
+      "upstream_reservoir": "Reservoir_A",
+      "downstream_reservoir": "Reservoir_B",
+      "power_levels": [
+        { "flow_rate_m3_s": 50, "power_MW": 80 },
+        { "flow_rate_m3_s": 100, "power_MW": 150 }
+      ]
+    },
+    {
+      "name": "Pump_B_A",
+      "type": "pump",
+      "upstream_reservoir": "Reservoir_B",
+      "downstream_reservoir": "Reservoir_A",
+      "power_levels": [
+        { "flow_rate_m3_s": 40, "power_MW": -60 }
+      ]
+    },
+    {
+      "name": "Turbine_B_C",
+      "type": "turbine",
+      "upstream_reservoir": "Reservoir_B",
+      "downstream_reservoir": "Reservoir_C",
+      "power_levels": [
+        { "flow_rate_m3_s": 70, "power_MW": 100 }
+      ]
+    }
+  ]
+}
