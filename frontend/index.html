@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <title>Hydro Valley Visualizer & Computer</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+    <header class="container">
+        <hgroup>
+            <h1>Hydro Valley Visualizer & Computer</h1>
+            <h2>Define a hydro valley and run computations</h2>
+        </hgroup>
+        <nav>
+            <ul>
+                <li><button class="secondary" id="theme-switcher">Toggle Theme</button></li>
+            </ul>
+        </nav>
+    </header>
+    <main class="container">
+        <div class="grid">
+            <!-- Left Column: Inputs & Results -->
+            <div>
+                <article>
+                    <hgroup>
+                        <h2>Valley Definition (JSON)</h2>
+                        <p>Edit the JSON below to see the graph update in real-time.</p>
+                    </hgroup>
+                    <textarea id="json-input" rows="25"></textarea>
+                    <footer>
+                        <button id="compute-btn">Compute Total Capacity</button>
+                    </footer>
+                </article>
+                <article>
+                    <hgroup>
+                        <h2>Computation Result</h2>
+                    </hgroup>
+                    <pre><code id="result-output">...</code></pre>
+                </article>
+            </div>
+
+            <!-- Right Column: Graph -->
+            <div>
+                <article>
+                    <hgroup>
+                        <h2>Valley Network Graph</h2>
+                    </hgroup>
+                    <div id="network-graph" style="min-height: 600px; border: 1px solid var(--pico-muted-border-color);"></div>
+                </article>
+            </div>
+        </div>
+    </main>
+    <script>
+        // --- Element References ---
+        const jsonInput = document.getElementById('json-input');
+        const computeBtn = document.getElementById('compute-btn');
+        const resultOutput = document.getElementById('result-output');
+        const networkContainer = document.getElementById('network-graph');
+        const themeSwitcher = document.getElementById('theme-switcher');
+        const htmlElement = document.documentElement;
+
+        // --- Vis.js Network Setup ---
+        let network = null;
+        const options = {
+            layout: {
+                hierarchical: { enabled: true, direction: 'UD', sortMethod: 'directed' }
+            },
+            physics: { enabled: false },
+            edges: { smooth: true, arrows: 'to' }
+        };
+
+        function drawNetwork(valleyData) {
+            try {
+                const nodes = new vis.DataSet(valleyData.reservoirs.map(r => ({
+                    id: r.name, label: r.name, shape: 'box', color: '#97C2FC'
+                })));
+
+                const edges = new vis.DataSet(valleyData.units.map(u => ({
+                    from: u.upstream_reservoir, to: u.downstream_reservoir,
+                    label: `${u.name} (${u.type})`,
+                    color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
+                    font: { align: 'top' }
+                })));
+
+                const data = { nodes: nodes, edges: edges };
+                if (network === null) {
+                    network = new vis.Network(networkContainer, data, options);
+                } else {
+                    network.setData(data);
+                }
+            } catch (e) {
+                console.error("Failed to draw network:", e);
+                if (network) network.setData({ nodes: [], edges: [] }); // Clear graph on error
+            }
+        }
+
+        // --- Event Listeners ---
+        jsonInput.addEventListener('input', () => {
+            try {
+                const valleyData = JSON.parse(jsonInput.value);
+                drawNetwork(valleyData);
+            } catch (e) {
+                // Gracefully handle incomplete/invalid JSON while typing
+                if (network) network.setData({ nodes: [], edges: [] });
+            }
+        });
+
+        computeBtn.addEventListener('click', async () => {
+            resultOutput.textContent = 'Computing...';
+            try {
+                const valleyData = JSON.parse(jsonInput.value);
+
+                const response = await fetch('/api/compute_valley', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(valleyData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                resultOutput.textContent = `Total Max Power Capacity: ${result.total_max_power_MW} MW`;
+
+            } catch (e) {
+                resultOutput.textContent = `Error: ${e.message}`;
+            }
+        });
+
+        // --- Theme Switcher ---
+        function setTheme(theme) {
+            htmlElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        }
+        themeSwitcher.addEventListener('click', () => {
+            const newTheme = htmlElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+        });
+
+        // --- Initial Load ---
+        async function loadInitialData() {
+            try {
+                const response = await fetch('/datasets/hydro_valley_instance.json');
+                const initialData = await response.json();
+                jsonInput.value = JSON.stringify(initialData, null, 2);
+                drawNetwork(initialData);
+            } catch (e) {
+                jsonInput.value = `Error loading initial data: ${e.message}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+            loadInitialData();
+        });
+    </script>
+</body>
+</html>

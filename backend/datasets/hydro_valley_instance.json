@@ -1,5 +1,5 @@
 {
-  "problem_name": "My Hydro Valley",
+  "problem_name": "Sample Hydro Valley",
   "time_horizon": {
     "timestep_hours": 1,
     "num_timesteps": 4
