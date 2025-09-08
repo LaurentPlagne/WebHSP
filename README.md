@@ -6,6 +6,15 @@ This web application demonstrates a multi-tier architecture with a frontend, a P
 - **Python Backend:** A Flask API that serves the frontend, manages datasets, and communicates with the Julia service.
 - **Julia Backend:** A high-performance service for numerical computations.
 
+## Features
+
+*   **Multiple Data Sources:** Provide data by selecting a pre-existing file, uploading a new one, or direct text input.
+*   **Real-time Plotting:** The plot of your original data updates instantly as you type or change your selection.
+*   **Side-by-Side Comparison:** View your original data and the processed result in two separate, clear plots.
+*   **Responsive Design:** The UI is fully responsive and works great on desktop or mobile.
+*   **Theme Switching:** Toggle between light and dark modes. Your preference is saved for your next visit.
+*   **Download Results:** Download the processed data as a `.csv` file with a single click.
+
 ## How to Run the Application
 
 To run this application, you will need to start both the Julia and Python servers.

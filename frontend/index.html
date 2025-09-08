@@ -8,8 +8,18 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
+    <header class="container">
+        <hgroup>
+            <h1>Data Plotter</h1>
+            <h2>Process and visualize data collections</h2>
+        </hgroup>
+        <nav>
+            <ul>
+                <li><button class="secondary" id="theme-switcher">Toggle Theme</button></li>
+            </ul>
+        </nav>
+    </header>
     <main class="container">
-        <h1>Data Plotter</h1>
         <div class="grid">
             <!-- Left Column: Inputs -->
             <div>
@@ -49,6 +59,7 @@
                 <article>
                     <hgroup>
                         <h2>Processed Data</h2>
+                        <button id="download-btn" class="outline" disabled>Download Result (CSV)</button>
                     </hgroup>
                     <div id="plot-processed" style="min-height: 370px;"></div>
                 </article>
@@ -63,6 +74,7 @@
         const plotOriginalDiv = document.getElementById('plot-original');
         const plotProcessedDiv = document.getElementById('plot-processed');
         const directInput = document.getElementById('direct-input');
+        const downloadBtn = document.getElementById('download-btn');
 
         // Fetch datasets and populate the dropdown
         async function fetchDatasets() {
@@ -82,6 +94,7 @@
         }
 
         let currentOriginalData = [];
+        let processedData = []; // To store the result for download
         const plotLayout = {
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
@@ -126,11 +139,36 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: currentOriginalData })
                 });
-                const processedData = await response.json();
+                processedData = await response.json(); // Store the data
                 Plotly.newPlot(plotProcessedDiv, [{ y: processedData, mode: 'lines+markers', name: 'Processed' }], { ...plotLayout, title: 'Processed Data' });
+                downloadBtn.disabled = false; // Enable the download button
             } catch (error) {
                 console.error('Error processing data:', error);
+                processedData = [];
+                downloadBtn.disabled = true;
             }
+        });
+
+        // Handle download button click
+        downloadBtn.addEventListener('click', () => {
+            if (processedData.length === 0) {
+                alert('No data to download.');
+                return;
+            }
+
+            // Convert array to CSV string
+            const csvContent = "data:text/csv;charset=utf-8,"
+                + "processed_value\n" // Header
+                + processedData.join("\n");
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "processed_data.csv");
+            document.body.appendChild(link); // Required for FF
+
+            link.click(); // This will download the data file
+            document.body.removeChild(link);
         });
 
         // Handle file upload
@@ -181,6 +219,27 @@
                 plotOriginalData('dataset', datasetSelect.value);
             }
         };
+
+        // --- Theme Switcher Logic ---
+        const themeSwitcher = document.getElementById('theme-switcher');
+        const htmlElement = document.documentElement;
+
+        function setTheme(theme) {
+            htmlElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        }
+
+        themeSwitcher.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+        });
+
+        // Apply saved theme on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+        });
 
         // Initial fetch of datasets
         fetchDatasets();
