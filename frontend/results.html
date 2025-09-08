@@ -41,9 +41,20 @@
                 }));
 
                 const plotLayout = {
-                    title: 'Reservoir Volume Simulation',
-                    xaxis: { title: 'Time Step (hour)' },
-                    yaxis: { title: 'Volume (Million m³)' },
+                    title: {
+                        text: 'Reservoir Volume Simulation',
+                        font: { size: 24 }
+                    },
+                    xaxis: {
+                        title: 'Time Step (hour)',
+                        titlefont: { size: 18 },
+                        tickfont: { size: 14 }
+                    },
+                    yaxis: {
+                        title: 'Volume (Million m³)',
+                        titlefont: { size: 18 },
+                        tickfont: { size: 14 }
+                    },
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     plot_bgcolor: 'rgba(0,0,0,0)',
                     font: { color: 'var(--pico-contrast)' }

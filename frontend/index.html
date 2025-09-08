@@ -106,16 +106,23 @@
         // --- Vis.js Network Setup ---
         let network = null;
         const options = {
-            physics: {
-                solver: 'barnesHut',
-                barnesHut: {
-                    gravitationalConstant: -8000,
-                    springConstant: 0.04,
-                    springLength: 150
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD', // Up-Down
+                    sortMethod: 'hubsize', // Default, handles cycles well
+                    levelSeparation: 150,
+                    nodeSpacing: 150,
+                    treeSpacing: 200
                 }
             },
+            physics: {
+                // Hierarchical layout enables its own physics solver
+                enabled: false
+            },
             edges: {
-                arrows: 'to'
+                arrows: 'to',
+                smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 }
             }
         };
 
@@ -126,26 +133,16 @@
 
                 // Add reservoir nodes (V-shape)
                 valleyData.reservoirs.forEach(r => {
-                    nodes.add({
-                        id: r.name,
-                        label: r.name,
-                        shape: 'triangleDown',
-                        color: '#1E90FF' // DodgerBlue
-                    });
+                    nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF' });
                 });
 
                 // Add unit nodes (circles) and connect them with edges
                 valleyData.units.forEach(u => {
                     nodes.add({
-                        id: u.name,
-                        label: u.name,
-                        shape: 'dot',
-                        size: 20,
-                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336' // Green for turbine, red for pump
+                        id: u.name, label: u.name, shape: 'dot', size: 20,
+                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336'
                     });
-                    // Edge from upstream reservoir to unit
                     edges.add({ from: u.upstream_reservoir, to: u.name });
-                    // Edge from unit to downstream reservoir
                     edges.add({ from: u.name, to: u.downstream_reservoir });
                 });
 
@@ -157,7 +154,7 @@
                 }
             } catch (e) {
                 console.error("Failed to draw network:", e);
-                if (network) network.setData({ nodes: [], edges: [] }); // Clear graph on error
+                if (network) network.setData({ nodes: [], edges: [] });
             }
         }
 
