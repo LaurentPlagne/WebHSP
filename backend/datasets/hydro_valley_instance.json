@@ -7,16 +7,19 @@
   "reservoirs": [
     {
       "name": "Reservoir_A",
+      "initial_volume_M_m3": 450,
       "min_volume_M_m3": [100, 100, 98, 95],
       "max_volume_M_m3": [500, 500, 498, 495]
     },
     {
       "name": "Reservoir_B",
+      "initial_volume_M_m3": 150,
       "min_volume_M_m3": [50, 50, 50, 50],
       "max_volume_M_m3": [200, 200, 200, 200]
     },
     {
       "name": "Reservoir_C",
+      "initial_volume_M_m3": 80,
       "min_volume_M_m3": [20, 20, 20, 20],
       "max_volume_M_m3": [100, 100, 100, 100]
     }

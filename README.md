@@ -6,7 +6,7 @@ This web application provides an interactive environment for defining, visualizi
 
 *   **Interactive Editor:** Define your hydro valley's reservoirs and units using a JSON editor.
 *   **Real-time Visualization:** The application features a side-by-side view with a network graph that updates in real-time as you edit the JSON, providing immediate visual feedback.
-*   **Julia-powered Computation:** Click the "Compute" button to send your valley definition to a high-performance Julia backend for analysis. The initial computation calculates the total maximum power capacity of all turbines.
+*   **Julia-powered Simulation:** Click the "Run Simulation" button to send your valley definition to a high-performance Julia backend. The server runs a dynamic simulation of the reservoir volumes over the specified time horizon using a random operation strategy.
 *   **Responsive Design:** The UI is fully responsive and works great on desktop or mobile, powered by Pico.css.
 *   **Theme Switching:** Toggle between light and dark modes. Your preference is saved for your next visit.
 
@@ -58,4 +58,4 @@ Once both servers are running, open your web browser and navigate to:
 
 **http://127.0.0.1:5000**
 
-You can edit the JSON on the left to see the graph on the right update. Click "Compute Total Capacity" to send the data to the Julia server and see the result.
+You can edit the JSON on the left to see the graph on the right update. Click "Run Simulation" to send the data to the Julia server. The results of the simulation (the reservoir volumes over time) will be plotted in a new chart below the JSON editor.

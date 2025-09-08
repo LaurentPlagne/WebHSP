@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <title>Hydro Valley Visualizer & Computer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
     <header class="container">
@@ -30,7 +31,7 @@
                     </hgroup>
                     <textarea id="json-input" rows="25"></textarea>
                     <footer>
-                        <button id="compute-btn">Compute Total Capacity</button>
+                        <button id="compute-btn">Run Simulation</button>
                     </footer>
                 </article>
                 <article>
@@ -39,15 +40,21 @@
                     </hgroup>
                     <pre><code id="result-output">...</code></pre>
                 </article>
+                <article>
+                    <hgroup>
+                        <h2>Reservoir Volume Simulation</h2>
+                    </hgroup>
+                    <div id="results-plot"></div>
+                </article>
             </div>
 
             <!-- Right Column: Graph -->
             <div>
-                <article>
+                <article style="height: 100%;">
                     <hgroup>
                         <h2>Valley Network Graph</h2>
                     </hgroup>
-                    <div id="network-graph" style="min-height: 600px; border: 1px solid var(--pico-muted-border-color);"></div>
+                    <div id="network-graph" style="height: 80vh; border: 1px solid var(--pico-muted-border-color);"></div>
                 </article>
             </div>
         </div>
@@ -57,6 +64,7 @@
         const jsonInput = document.getElementById('json-input');
         const computeBtn = document.getElementById('compute-btn');
         const resultOutput = document.getElementById('result-output');
+        const resultsPlotDiv = document.getElementById('results-plot');
         const networkContainer = document.getElementById('network-graph');
         const themeSwitcher = document.getElementById('theme-switcher');
         const htmlElement = document.documentElement;
@@ -108,11 +116,13 @@
         });
 
         computeBtn.addEventListener('click', async () => {
-            resultOutput.textContent = 'Computing...';
+            resultOutput.textContent = 'Running simulation...';
+            Plotly.purge(resultsPlotDiv); // Clear previous plot
             try {
                 const valleyData = JSON.parse(jsonInput.value);
 
-                const response = await fetch('/api/compute_valley', {
+                // Note: The Python backend will need to proxy to /run_simulation
+                const response = await fetch('/api/run_simulation', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(valleyData)
@@ -123,7 +133,25 @@
                 }
 
                 const result = await response.json();
-                resultOutput.textContent = `Total Max Power Capacity: ${result.total_max_power_MW} MW`;
+                resultOutput.textContent = 'Simulation complete.';
+
+                const plotData = Object.keys(result).map(reservoirName => ({
+                    x: Array.from({length: result[reservoirName].length}, (_, i) => i), // Timesteps 0, 1, 2...
+                    y: result[reservoirName],
+                    mode: 'lines+markers',
+                    name: reservoirName
+                }));
+
+                const plotLayout = {
+                    title: 'Reservoir Volume Simulation',
+                    xaxis: { title: 'Time Step (hour)' },
+                    yaxis: { title: 'Volume (Million m³)' },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    font: { color: 'var(--pico-contrast)' }
+                };
+
+                Plotly.newPlot(resultsPlotDiv, plotData, plotLayout);
 
             } catch (e) {
                 resultOutput.textContent = `Error: ${e.message}`;

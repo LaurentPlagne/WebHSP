@@ -4,7 +4,8 @@ import os
 
 app = Flask(__name__, static_folder='../frontend')
 
-JULIA_SERVER_URL = "http://127.0.0.1:8081/compute_capacity"
+# The URL of the Julia server's simulation endpoint
+JULIA_SERVER_URL = "http://127.0.0.1:8081/run_simulation"
 
 @app.route('/')
 def index():
@@ -17,10 +18,11 @@ def static_proxy(path):
 
 @app.route('/datasets/<path:path>')
 def send_dataset(path):
+    # This serves the initial sample data file to the frontend
     return send_from_directory(os.path.join(os.path.dirname(__file__), 'datasets'), path)
 
-@app.route('/api/compute_valley', methods=['POST'])
-def compute_valley():
+@app.route('/api/run_simulation', methods=['POST'])
+def run_simulation_proxy():
     valley_data = request.get_json()
     if not valley_data:
         abort(400, 'Missing JSON data in request')
