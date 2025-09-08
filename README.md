@@ -39,23 +39,18 @@ This command will download and install the exact versions of the packages requir
 
 ### 3. Running the Servers
 
-You need to run both servers simultaneously in separate terminal windows.
+Convenience scripts are provided to start and stop both servers at once.
 
-**A. Start the Julia Server**
+*   **To start both servers:**
+    ```bash
+    ./start.sh
+    ```
+    This will launch the servers in the background. You can monitor their output in `julia_server.log` and `backend.log`.
 
-In your first terminal, run the server from the root directory, activating its project environment:
-```bash
-julia --project=julia_server julia_server/server.jl
-```
-You should see the message: `Starting Julia server on http://127.0.0.1:8081`
-
-**B. Start the Python Server**
-
-In your second terminal, run:
-```bash
-python backend/app.py
-```
-This will start the Flask development server, typically on `http://127.0.0.1:5000`.
+*   **To stop both servers:**
+    ```bash
+    ./kill.sh
+    ```
 
 ### 4. Using the Application
 

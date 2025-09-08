@@ -10,37 +10,49 @@
 <body>
     <main class="container">
         <h1>Data Plotter</h1>
-
-        <article>
-            <hgroup>
-                <h2>1. Select an Existing Dataset</h2>
-            </hgroup>
-            <select id="dataset-select"></select>
-            <button id="process-btn">Process Selected Dataset</button>
-        </article>
-
-        <article>
-            <hgroup>
-                <h2>2. Upload a New Dataset</h2>
-            </hgroup>
-            <form id="upload-form">
-                <input type="file" id="file-input" name="file" accept=".json,.csv">
-                <button type="submit">Upload</button>
-            </form>
-        </article>
-
-        <article>
-            <hgroup>
-                <h2>3. Use Direct Input</h2>
-                <p>Enter data as a JSON array, e.g., <code>[1.1, 2.2, 3.3]</code></p>
-            </hgroup>
-            <textarea id="direct-input" rows="5" placeholder="[1.1, 2.2, 3.3]"></textarea>
-            <button id="process-direct-btn">Process Direct Input</button>
-        </article>
-
         <div class="grid">
-            <div id="plot-original"></div>
-            <div id="plot-processed"></div>
+            <!-- Left Column: Inputs -->
+            <div>
+                <article id="input-article">
+                    <hgroup>
+                        <h2>1. Select an Existing Dataset</h2>
+                    </hgroup>
+                    <select id="dataset-select"></select>
+
+                    <hgroup>
+                        <h2>2. Upload a New Dataset</h2>
+                    </hgroup>
+                    <form id="upload-form">
+                        <input type="file" id="file-input" name="file" accept=".json,.csv">
+                        <button type="submit">Upload</button>
+                    </form>
+
+                    <hgroup>
+                        <h2>3. Use Direct Input</h2>
+                        <p>Enter data as a JSON array, e.g., <code>[1.1, 2.2, 3.3]</code></p>
+                    </hgroup>
+                    <textarea id="direct-input" rows="5" placeholder="[1.1, 2.2, 3.3]"></textarea>
+
+                    <footer>
+                        <button id="process-btn">Process Current Input</button>
+                    </footer>
+                </article>
+            </div>
+            <!-- Right Column: Plots -->
+            <div>
+                <article>
+                    <hgroup>
+                        <h2>Original Data</h2>
+                    </hgroup>
+                    <div id="plot-original" style="min-height: 370px;"></div>
+                </article>
+                <article>
+                    <hgroup>
+                        <h2>Processed Data</h2>
+                    </hgroup>
+                    <div id="plot-processed" style="min-height: 370px;"></div>
+                </article>
+            </div>
         </div>
     </main>
     <script>
@@ -51,7 +63,6 @@
         const plotOriginalDiv = document.getElementById('plot-original');
         const plotProcessedDiv = document.getElementById('plot-processed');
         const directInput = document.getElementById('direct-input');
-        const processDirectBtn = document.getElementById('process-direct-btn');
 
         // Fetch datasets and populate the dropdown
         async function fetchDatasets() {
@@ -70,43 +81,55 @@
             }
         }
 
-        // Process the selected dataset
+        let currentOriginalData = [];
+        const plotLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: 'var(--pico-contrast)' }
+        };
+
+        async function plotOriginalData(sourceType, sourceValue) {
+            let data;
+            try {
+                if (sourceType === 'dataset') {
+                    const response = await fetch(`/datasets/${sourceValue}`);
+                    if (sourceValue.endsWith('.csv')) {
+                        const csvText = await response.text();
+                        data = csvText.split(/\r?\n/).filter(line => line.trim() !== '').map(Number);
+                    } else {
+                        data = await response.json();
+                    }
+                } else if (sourceType === 'direct') {
+                    data = JSON.parse(sourceValue);
+                    if (!Array.isArray(data)) throw new Error("Input is not a JSON array.");
+                }
+                currentOriginalData = data; // Store for processing
+                Plotly.newPlot(plotOriginalDiv, [{ y: data, mode: 'lines+markers', name: 'Original' }], { ...plotLayout, title: 'Original Data' });
+            } catch (error) {
+                console.error("Error plotting original data:", error);
+                Plotly.purge(plotOriginalDiv); // Clear plot on error
+                currentOriginalData = [];
+            }
+        }
+
+        // Process the current data
         processBtn.addEventListener('click', async () => {
-            const selectedDataset = datasetSelect.value;
-            if (!selectedDataset) {
-                alert('Please select a dataset.');
+            if (currentOriginalData.length === 0) {
+                alert('No valid data to process.');
                 return;
             }
 
             try {
-                const response = await fetch('/api/process', {
+                // The new endpoint can handle the data directly
+                const response = await fetch('/api/process_direct', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dataset: selectedDataset })
+                    body: JSON.stringify({ data: currentOriginalData })
                 });
                 const processedData = await response.json();
-
-                // Fetch original data to plot alongside processed data
-                const originalResponse = await fetch(`/datasets/${selectedDataset}`);
-                let originalData;
-                if (selectedDataset.endsWith('.csv')) {
-                    const csvText = await originalResponse.text();
-                    originalData = csvText.split(/\r?\n/).filter(line => line.trim() !== '').map(Number);
-                } else {
-                    originalData = await originalResponse.json();
-                }
-
-                // Plot the data
-                const layout = {
-                    title: 'Original Data',
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: { color: 'var(--pico-contrast)' }
-                };
-                Plotly.newPlot(plotOriginalDiv, [{ y: originalData, mode: 'lines+markers', name: 'Original' }], layout);
-                Plotly.newPlot(plotProcessedDiv, [{ y: processedData, mode: 'lines+markers', name: 'Processed' }], { ...layout, title: 'Processed Data' });
+                Plotly.newPlot(plotProcessedDiv, [{ y: processedData, mode: 'lines+markers', name: 'Processed' }], { ...plotLayout, title: 'Processed Data' });
             } catch (error) {
-                console.error('Error processing dataset:', error);
+                console.error('Error processing data:', error);
             }
         });
 
@@ -138,50 +161,29 @@
             }
         });
 
+        // Add event listeners for real-time plotting
+        datasetSelect.addEventListener('change', () => {
+            plotOriginalData('dataset', datasetSelect.value);
+            directInput.value = ''; // Clear other input
+        });
+
+        directInput.addEventListener('input', () => {
+            plotOriginalData('direct', directInput.value);
+            datasetSelect.value = ''; // Clear other input
+        });
+
+        // Override the fetchDatasets to plot on load
+        const originalFetchDatasets = fetchDatasets;
+        fetchDatasets = async () => {
+            await originalFetchDatasets();
+            if (datasetSelect.options.length > 0) {
+                datasetSelect.value = datasetSelect.options[0].value;
+                plotOriginalData('dataset', datasetSelect.value);
+            }
+        };
+
         // Initial fetch of datasets
         fetchDatasets();
-
-        // Handle direct input processing
-        processDirectBtn.addEventListener('click', async () => {
-            const inputText = directInput.value.trim();
-            if (!inputText) {
-                alert('Please enter data in the textarea.');
-                return;
-            }
-
-            let originalData;
-            try {
-                originalData = JSON.parse(inputText);
-                if (!Array.isArray(originalData)) {
-                    alert('Invalid input: Please enter a valid JSON array.');
-                    return;
-                }
-            } catch (error) {
-                alert('Invalid JSON format.');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/process_direct', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: originalData })
-                });
-                const processedData = await response.json();
-
-                // Plot the data
-                const layout = {
-                    title: 'Original Data',
-                    paper_bgcolor: 'rgba(0,0,0,0)',
-                    plot_bgcolor: 'rgba(0,0,0,0)',
-                    font: { color: 'var(--pico-contrast)' }
-                };
-                Plotly.newPlot(plotOriginalDiv, [{ y: originalData, mode: 'lines+markers', name: 'Original' }], layout);
-                Plotly.newPlot(plotProcessedDiv, [{ y: processedData, mode: 'lines+markers', name: 'Processed' }], { ...layout, title: 'Processed Data' });
-            } catch (error) {
-                console.error('Error processing direct input:', error);
-            }
-        });
     </script>
 </body>
 </html>
