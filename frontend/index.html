@@ -88,9 +88,9 @@
                 const nodeLevels = {};
 
                 // --- Final, Correct Level Assignment Logic ---
-                const allDownstream = new Set(valleyData.units.map(u => u.downstream_reservoir));
+                const turbineDownstream = new Set(valleyData.units.filter(u => u.type === 'turbine').map(u => u.downstream_reservoir));
                 valleyData.reservoirs.forEach(r => {
-                    if (!allDownstream.has(r.name)) {
+                    if (!turbineDownstream.has(r.name)) {
                         nodeLevels[r.name] = 0;
                     }
                 });
