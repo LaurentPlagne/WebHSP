@@ -31,8 +31,8 @@
       "upstream_reservoir": "Reservoir_A",
       "downstream_reservoir": "Reservoir_B",
       "power_levels": [
-        { "flow_rate_m3_s": 50, "power_MW": 80 },
-        { "flow_rate_m3_s": 100, "power_MW": 150 }
+        { "flow_rate_m3_s": 500, "power_MW": 80 },
+        { "flow_rate_m3_s": 1000, "power_MW": 150 }
       ]
     },
     {
@@ -41,7 +41,7 @@
       "upstream_reservoir": "Reservoir_B",
       "downstream_reservoir": "Reservoir_A",
       "power_levels": [
-        { "flow_rate_m3_s": 40, "power_MW": -60 }
+        { "flow_rate_m3_s": 400, "power_MW": -60 }
       ]
     },
     {
@@ -50,7 +50,7 @@
       "upstream_reservoir": "Reservoir_B",
       "downstream_reservoir": "Reservoir_C",
       "power_levels": [
-        { "flow_rate_m3_s": 70, "power_MW": 100 }
+        { "flow_rate_m3_s": 700, "power_MW": 100 }
       ]
     }
   ]

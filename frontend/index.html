@@ -7,6 +7,19 @@
     <title>Hydro Valley Visualizer & Computer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* Make the main grid expand to fill vertical space */
+        main.container .grid {
+            grid-template-columns: 1fr 1.5fr; /* Give more space to the graph */
+        }
+        #network-graph {
+            height: 80vh; /* Make graph tall */
+            border: 1px solid var(--pico-muted-border-color);
+        }
+        #results-plot {
+            min-height: 400px; /* Give the results plot a default size */
+        }
+    </style>
 </head>
 <body>
     <header class="container">
@@ -50,11 +63,11 @@
 
             <!-- Right Column: Graph -->
             <div>
-                <article style="height: 100%;">
+                <article>
                     <hgroup>
                         <h2>Valley Network Graph</h2>
                     </hgroup>
-                    <div id="network-graph" style="height: 80vh; border: 1px solid var(--pico-muted-border-color);"></div>
+                    <div id="network-graph"></div>
                 </article>
             </div>
         </div>
