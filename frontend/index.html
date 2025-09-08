@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Plotter</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Data Plotter</h1>
+
+    <div>
+        <h2>Select a Dataset</h2>
+        <select id="dataset-select"></select>
+        <button id="process-btn">Process</button>
+    </div>
+
+    <div>
+        <h2>Upload a Dataset</h2>
+        <form id="upload-form">
+            <input type="file" id="file-input" name="file" accept=".json,.csv">
+            <button type="submit">Upload</button>
+        </form>
+    </div>
+
+    <div>
+        <h2>Direct Input (JSON array)</h2>
+        <textarea id="direct-input" rows="5" cols="40" placeholder="[1.1, 2.2, 3.3]"></textarea>
+        <br>
+        <button id="process-direct-btn">Process Direct Input</button>
+    </div>
+
+    <div id="plot"></div>
+
+    <script>
+        const datasetSelect = document.getElementById('dataset-select');
+        const processBtn = document.getElementById('process-btn');
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const plotDiv = document.getElementById('plot');
+        const directInput = document.getElementById('direct-input');
+        const processDirectBtn = document.getElementById('process-direct-btn');
+
+        // Fetch datasets and populate the dropdown
+        async function fetchDatasets() {
+            try {
+                const response = await fetch('/api/datasets');
+                const datasets = await response.json();
+                datasetSelect.innerHTML = '';
+                datasets.forEach(dataset => {
+                    const option = document.createElement('option');
+                    option.value = dataset;
+                    option.textContent = dataset;
+                    datasetSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching datasets:', error);
+            }
+        }
+
+        // Process the selected dataset
+        processBtn.addEventListener('click', async () => {
+            const selectedDataset = datasetSelect.value;
+            if (!selectedDataset) {
+                alert('Please select a dataset.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataset: selectedDataset })
+                });
+                const processedData = await response.json();
+
+                // Fetch original data to plot alongside processed data
+                const originalResponse = await fetch(`/datasets/${selectedDataset}`);
+                let originalData;
+                if (selectedDataset.endsWith('.csv')) {
+                    const csvText = await originalResponse.text();
+                    originalData = csvText.split(/\\r?\\n/).filter(line => line.trim() !== '').map(Number);
+                } else {
+                    originalData = await originalResponse.json();
+                }
+
+                // Plot the data
+                Plotly.newPlot(plotDiv, [
+                    { y: originalData, mode: 'lines+markers', name: 'Original' },
+                    { y: processedData, mode: 'lines+markers', name: 'Processed' }
+                ]);
+            } catch (error) {
+                console.error('Error processing dataset:', error);
+            }
+        });
+
+        // Handle file upload
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    alert('File uploaded successfully!');
+                    fetchDatasets(); // Refresh the dataset list
+                } else {
+                    alert('Error uploading file.');
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+            }
+        });
+
+        // Initial fetch of datasets
+        fetchDatasets();
+
+        // Handle direct input processing
+        processDirectBtn.addEventListener('click', async () => {
+            const inputText = directInput.value.trim();
+            if (!inputText) {
+                alert('Please enter data in the textarea.');
+                return;
+            }
+
+            let originalData;
+            try {
+                originalData = JSON.parse(inputText);
+                if (!Array.isArray(originalData)) {
+                    alert('Invalid input: Please enter a valid JSON array.');
+                    return;
+                }
+            } catch (error) {
+                alert('Invalid JSON format.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/process_direct', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: originalData })
+                });
+                const processedData = await response.json();
+
+                // Plot the data
+                Plotly.newPlot(plotDiv, [
+                    { y: originalData, mode: 'lines+markers', name: 'Original' },
+                    { y: processedData, mode: 'lines+markers', name: 'Processed' }
+                ]);
+            } catch (error) {
+                console.error('Error processing direct input:', error);
+            }
+        });
+    </script>
+</body>
+</html>
