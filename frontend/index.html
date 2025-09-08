@@ -1,52 +1,19 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
-    <meta charset="utf-8">
+    <meta charset="utf-t">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <title>Hydro Valley Visualizer & Computer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
-        /* Ensure body and html take full height */
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-        /* Make body a flex container to push main content down */
-        body {
-            display: flex;
-            flex-direction: column;
-        }
-        /* Make the main content area grow to fill available space */
-        main.container {
-            flex-grow: 1;
-            display: flex; /* Use flexbox for the main container as well */
-            flex-direction: column;
-        }
-        main.container > .grid {
-            flex-grow: 1; /* Make the grid fill the main container */
-            grid-template-columns: 1fr 1.5fr;
-            gap: var(--pico-spacing);
-        }
-        /* Make the articles within the grid columns stretch */
-        .grid > div, .grid > div > article {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-        /* Make the graph container fill its parent article */
-        #network-graph {
-            flex-grow: 1; /* Grow to fill the article */
-            border: 1px solid var(--pico-muted-border-color);
-        }
-        /* Give the results plot a larger, fixed size */
-        #results-plot {
-            min-height: 450px;
-        }
-        /* Make the JSON textarea taller */
-        #json-input {
-            flex-grow: 1;
-        }
+        html, body { height: 100%; margin: 0; }
+        body { display: flex; flex-direction: column; }
+        main.container { flex-grow: 1; display: flex; flex-direction: column; }
+        main.container > .grid { flex-grow: 1; grid-template-columns: 1fr 1.5fr; gap: var(--pico-spacing); }
+        .grid > div, .grid > div > article { height: 100%; display: flex; flex-direction: column; }
+        #network-graph { flex-grow: 1; border: 1px solid var(--pico-muted-border-color); }
+        #json-input { flex-grow: 1; }
     </style>
 </head>
 <body>
@@ -63,7 +30,6 @@
     </header>
     <main class="container">
         <div class="grid">
-            <!-- Left Column: Inputs & Results -->
             <div>
                 <article>
                     <hgroup>
@@ -82,8 +48,6 @@
                     <pre><code id="result-output">...</code></pre>
                 </article>
             </div>
-
-            <!-- Right Column: Graph -->
             <div>
                 <article>
                     <hgroup>
@@ -95,58 +59,82 @@
         </div>
     </main>
     <script>
-        // --- Element References ---
         const jsonInput = document.getElementById('json-input');
         const computeBtn = document.getElementById('compute-btn');
         const resultOutput = document.getElementById('result-output');
         const networkContainer = document.getElementById('network-graph');
         const themeSwitcher = document.getElementById('theme-switcher');
         const htmlElement = document.documentElement;
-
-        // --- Vis.js Network Setup ---
         let network = null;
+
         const options = {
             layout: {
                 hierarchical: {
                     enabled: true,
-                    direction: 'UD', // Up-Down
-                    sortMethod: 'hubsize', // Default, handles cycles well
-                    levelSeparation: 150,
+                    direction: 'UD',
+                    sortMethod: 'directed',
+                    levelSeparation: 120,
                     nodeSpacing: 150,
-                    treeSpacing: 200
                 }
             },
-            physics: {
-                // Hierarchical layout enables its own physics solver
-                enabled: false
-            },
-            edges: {
-                arrows: 'to',
-                smooth: { type: 'cubicBezier', forceDirection: 'vertical', roundness: 0.4 }
-            }
+            physics: { enabled: false },
+            edges: { arrows: 'to' }
         };
 
         function drawNetwork(valleyData) {
             try {
                 const nodes = new vis.DataSet();
                 const edges = new vis.DataSet();
+                const nodeLevels = {};
 
-                // Add reservoir nodes (V-shape)
+                // --- Final, Correct Level Assignment Logic ---
+                const allDownstream = new Set(valleyData.units.map(u => u.downstream_reservoir));
                 valleyData.reservoirs.forEach(r => {
-                    nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF' });
+                    if (!allDownstream.has(r.name)) {
+                        nodeLevels[r.name] = 0;
+                    }
                 });
 
-                // Add unit nodes (circles) and connect them with edges
+                const maxIterations = valleyData.reservoirs.length + valleyData.units.length;
+                for (let i = 0; i < maxIterations; i++) {
+                    valleyData.units.forEach(unit => {
+                        const upLevel = nodeLevels[unit.upstream_reservoir];
+                        if (upLevel !== undefined) {
+                            // Set unit level
+                            const newUnitLevel = upLevel + 1;
+                            if (nodeLevels[unit.name] === undefined || newUnitLevel > nodeLevels[unit.name]) {
+                                nodeLevels[unit.name] = newUnitLevel;
+                            }
+                            // Set downstream reservoir level
+                            const newDownstreamLevel = newUnitLevel + 1;
+                            if (nodeLevels[unit.downstream_reservoir] === undefined || newDownstreamLevel > nodeLevels[unit.downstream_reservoir]) {
+                                nodeLevels[unit.downstream_reservoir] = newDownstreamLevel;
+                            }
+                        }
+                    });
+                }
+
+                valleyData.reservoirs.forEach(r => {
+                    nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF', level: nodeLevels[r.name] });
+                });
+
                 valleyData.units.forEach(u => {
                     nodes.add({
                         id: u.name, label: u.name, shape: 'dot', size: 20,
-                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336'
+                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
+                        level: nodeLevels[u.name]
                     });
-                    edges.add({ from: u.upstream_reservoir, to: u.name });
-                    edges.add({ from: u.name, to: u.downstream_reservoir });
+
+                    const isPump = u.type === 'pump';
+                    const edgeOptions = {
+                        smooth: { enabled: true, type: isPump ? 'curvedCCW' : 'curvedCW', roundness: 0.25 },
+                    };
+
+                    edges.add({ from: u.upstream_reservoir, to: u.name, ...edgeOptions });
+                    edges.add({ from: u.name, to: u.downstream_reservoir, ...edgeOptions });
                 });
 
-                const data = { nodes: nodes, edges: edges };
+                const data = { nodes, edges };
                 if (network === null) {
                     network = new vis.Network(networkContainer, data, options);
                 } else {
@@ -158,13 +146,11 @@
             }
         }
 
-        // --- Event Listeners ---
         jsonInput.addEventListener('input', () => {
             try {
                 const valleyData = JSON.parse(jsonInput.value);
                 drawNetwork(valleyData);
             } catch (e) {
-                // Gracefully handle incomplete/invalid JSON while typing
                 if (network) network.setData({ nodes: [], edges: [] });
             }
         });
@@ -173,29 +159,20 @@
             resultOutput.textContent = 'Running simulation...';
             try {
                 const valleyData = JSON.parse(jsonInput.value);
-
                 const response = await fetch('/api/run_simulation', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(valleyData)
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.statusText}`);
-                }
-
+                if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
                 const result = await response.json();
-
-                // Save results to session storage and redirect
                 sessionStorage.setItem('simulationResults', JSON.stringify(result));
                 window.location.href = 'results.html';
-
             } catch (e) {
                 resultOutput.textContent = `Error: ${e.message}`;
             }
         });
 
-        // --- Theme Switcher ---
         function setTheme(theme) {
             htmlElement.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
@@ -205,7 +182,6 @@
             setTheme(newTheme);
         });
 
-        // --- Initial Load ---
         async function loadInitialData() {
             try {
                 const response = await fetch('/datasets/hydro_valley_instance.json');

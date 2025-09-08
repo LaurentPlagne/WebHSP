@@ -60,13 +60,3 @@ Once both servers are running, open your web browser and navigate to:
 **http://127.0.0.1:5000**
 
 You can edit the JSON on the left to see the graph on the right update. Click "Run Simulation" to send the data to the Julia server. You will be automatically redirected to a new page where the simulation results (the reservoir volumes over time) will be plotted in a large chart.
-
-## Verification
-
-This repository includes sample output images and a script to regenerate them.
-
-*   **Sample Outputs:** See the `output_images/` directory for examples of the valley graph and the results plot.
-*   **Run Verification Script:** To regenerate these images yourself, you first need to install Playwright (`pip install playwright` and `playwright install`). Then, while the application is running, execute the verification script:
-    ```bash
-    python verify.py
-    ```

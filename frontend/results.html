@@ -7,9 +7,8 @@
     <title>Simulation Results - Hydro Valley</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body {
-            padding: var(--pico-spacing);
-        }
+        body { padding: var(--pico-spacing); }
+        #results-plot { min-height: 80vh; }
     </style>
 </head>
 <body>
@@ -18,54 +17,70 @@
             <h1>Simulation Results</h1>
             <h2>Reservoir Volumes Over Time</h2>
         </hgroup>
-        <div id="results-plot" style="min-height: 80vh;"></div>
-        <a href="index.html" role="button" class="secondary">Back to Main Page</a>
+        <div id="results-plot"></div>
+        <footer>
+            <a href="index.html" role="button" class="secondary">Back to Main Page</a>
+            <button id="download-btn" class="contrast" disabled>Download Result (CSV)</button>
+        </footer>
     </main>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Apply theme from localStorage
+            const downloadBtn = document.getElementById('download-btn');
+            let simulationResult = null;
+
             const htmlElement = document.documentElement;
             const savedTheme = localStorage.getItem('theme') || 'light';
             htmlElement.setAttribute('data-theme', savedTheme);
 
-            // Get data from sessionStorage
             const resultsDataString = sessionStorage.getItem('simulationResults');
             if (resultsDataString) {
-                const result = JSON.parse(resultsDataString);
+                simulationResult = JSON.parse(resultsDataString);
 
-                const plotData = Object.keys(result).map(reservoirName => ({
-                    x: Array.from({length: result[reservoirName].length}, (_, i) => i),
-                    y: result[reservoirName],
+                const plotData = Object.keys(simulationResult).map(reservoirName => ({
+                    x: Array.from({length: simulationResult[reservoirName].length}, (_, i) => i),
+                    y: simulationResult[reservoirName],
                     mode: 'lines+markers',
                     name: reservoirName
                 }));
 
                 const plotLayout = {
-                    title: {
-                        text: 'Reservoir Volume Simulation',
-                        font: { size: 24 }
-                    },
-                    xaxis: {
-                        title: 'Time Step (hour)',
-                        titlefont: { size: 18 },
-                        tickfont: { size: 14 }
-                    },
-                    yaxis: {
-                        title: 'Volume (Million m³)',
-                        titlefont: { size: 18 },
-                        tickfont: { size: 14 }
-                    },
+                    title: { text: 'Reservoir Volume Simulation', font: { size: 24 } },
+                    xaxis: { title: 'Time Step (hour)', titlefont: { size: 18 }, tickfont: { size: 14 } },
+                    yaxis: { title: 'Volume (Million m³)', titlefont: { size: 18 }, tickfont: { size: 14 } },
                     paper_bgcolor: 'rgba(0,0,0,0)',
                     plot_bgcolor: 'rgba(0,0,0,0)',
                     font: { color: 'var(--pico-contrast)' }
                 };
 
                 Plotly.newPlot('results-plot', plotData, plotLayout);
+                downloadBtn.disabled = false;
+
+                downloadBtn.addEventListener('click', () => {
+                    const headers = ['timestep', ...Object.keys(simulationResult)];
+                    const numRows = simulationResult[headers[1]].length;
+                    let csvContent = headers.join(',') + '\n';
+                    for (let i = 0; i < numRows; i++) {
+                        const row = [i];
+                        headers.slice(1).forEach(reservoirName => {
+                            row.push(simulationResult[reservoirName][i]);
+                        });
+                        csvContent += row.join(',') + '\n';
+                    }
+                    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "simulation_results.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+
             } else {
-                // Handle case where no data is found
                 const plotDiv = document.getElementById('results-plot');
                 plotDiv.innerHTML = '<p>No simulation data found. Please <a href="index.html">go back and run a simulation</a>.</p>';
             }
+
+            window.addEventListener('resize', () => Plotly.Plots.resize('results-plot'));
         });
     </script>
 </body>
