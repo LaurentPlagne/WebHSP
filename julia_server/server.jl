@@ -2,6 +2,48 @@ using HTTP
 using JSON
 using Random
 
+# Function to calculate node levels for hierarchical layout
+function calculate_node_levels(reservoirs, units)
+    node_levels = Dict{String, Int}()
+
+    # Identify all reservoirs that are downstream of a turbine
+    turbine_downstream = Set{String}()
+    for unit in units
+        if unit["type"] == "turbine"
+            push!(turbine_downstream, unit["downstream_reservoir"])
+        end
+    end
+
+    # Initialize levels for top-level reservoirs (not downstream of any turbine)
+    for reservoir in reservoirs
+        if !(reservoir["name"] in turbine_downstream)
+            node_levels[reservoir["name"]] = 0
+        end
+    end
+
+    # Iteratively determine levels for all other nodes
+    max_iterations = length(reservoirs) + length(units)
+    for _ in 1:max_iterations
+        for unit in units
+            upstream_reservoir = unit["upstream_reservoir"]
+            if haskey(node_levels, upstream_reservoir)
+                unit_level = node_levels[upstream_reservoir] + 1
+                if !haskey(node_levels, unit["name"]) || unit_level > node_levels[unit["name"]]
+                    node_levels[unit["name"]] = unit_level
+                end
+
+                downstream_reservoir = unit["downstream_reservoir"]
+                downstream_level = unit_level + 1
+                if !haskey(node_levels, downstream_reservoir) || downstream_level > node_levels[downstream_reservoir]
+                    node_levels[downstream_reservoir] = downstream_level
+                end
+            end
+        end
+    end
+
+    return node_levels
+end
+
 # Function to run the hydro valley simulation
 function run_simulation(req::HTTP.Request)
     try
@@ -35,6 +77,9 @@ function run_simulation(req::HTTP.Request)
         # 3. Initialize reservoir volumes and history
         reservoir_volumes = Dict{String, Float64}(r["name"] => r["initial_volume_M_m3"] for r in reservoirs)
         volume_history = Dict{String, Vector{Float64}}(r["name"] => [r["initial_volume_M_m3"]] for r in reservoirs)
+
+        # 2.5 Calculate node levels for graph visualization
+        node_levels = calculate_node_levels(reservoirs, units)
 
         # 4. Main simulation loop
         for t in 1:num_timesteps
@@ -83,7 +128,13 @@ function run_simulation(req::HTTP.Request)
             end
         end
 
-        return HTTP.Response(200, ["Content-Type" => "application/json"], body=JSON.json(volume_history))
+        # 5. Combine results and return
+        response_data = Dict(
+            "volume_history" => volume_history,
+            "node_levels" => node_levels
+        )
+
+        return HTTP.Response(200, ["Content-Type" => "application/json"], body=JSON.json(response_data))
 
     catch e
         println("Error during simulation: $e")

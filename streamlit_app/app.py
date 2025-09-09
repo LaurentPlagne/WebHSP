@@ -34,19 +34,20 @@ def load_network_html():
         return ""
 
 def results_to_dataframe(results):
-    """Converts the simulation results dictionary to a Pandas DataFrame."""
     return pd.DataFrame(results)
 
 def convert_df_to_csv(df):
-    """Converts a DataFrame to a CSV string."""
     return df.to_csv(index=True).encode('utf-8')
 
 # --- Main Application UI ---
 st.title("Hydro Valley Visualizer & Computer")
 st.markdown("Define your hydro valley using the JSON editor below, view the network graph, and run a simulation.")
 
+# Initialize session state
 if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = None
+if 'node_levels' not in st.session_state:
+    st.session_state.node_levels = None
 
 default_data = load_default_data()
 initial_json_text = json.dumps(default_data, indent=2) if default_data else "{}"
@@ -63,7 +64,12 @@ with col2:
     st.subheader("Valley Network Graph")
     try:
         valley_data = json.loads(json_input)
-        network_html = network_html_template.replace("%%VALLEY_DATA%%", json.dumps(valley_data))
+        # Prepare data for the HTML component
+        graph_data = {
+            "valleyData": valley_data,
+            "nodeLevels": st.session_state.get('node_levels') # Pass levels if available
+        }
+        network_html = network_html_template.replace("%%GRAPH_DATA%%", json.dumps(graph_data))
         components.html(network_html, height=625)
     except json.JSONDecodeError:
         st.warning("Invalid JSON. Please correct it to see the graph.")
@@ -76,8 +82,12 @@ if run_button:
         with st.spinner('Running simulation...'):
             response = requests.post(JULIA_SERVER_URL, json=valley_data, timeout=30)
             response.raise_for_status()
-            st.session_state.simulation_results = response.json()
+            response_data = response.json()
+            # Store both results and levels in session state
+            st.session_state.simulation_results = response_data.get("volume_history")
+            st.session_state.node_levels = response_data.get("node_levels")
         st.success("Simulation completed successfully!")
+        st.experimental_rerun() # Rerun to update the graph with new levels
     except json.JSONDecodeError:
         st.error("Invalid JSON format. Cannot run simulation.")
     except requests.exceptions.RequestException as e:

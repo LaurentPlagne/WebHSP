@@ -14,7 +14,7 @@ echo "Julia server started with PID: $JULIA_PID"
 echo "Starting Streamlit server in the background..."
 # Run the Streamlit server
 # Redirect stdout and stderr to a log file.
-streamlit run streamlit_app/app.py > streamlit.log 2>&1 &
+streamlit run streamlit_app/app.py --server.headless true > streamlit.log 2>&1 &
 STREAMLIT_PID=$!
 echo "Streamlit server started with PID: $STREAMLIT_PID"
 

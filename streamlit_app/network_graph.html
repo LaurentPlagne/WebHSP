@@ -26,7 +26,9 @@
         let network = null;
 
         // This is the data placeholder that will be replaced by Streamlit
-        const valleyData = %%VALLEY_DATA%%;
+        const graphData = %%GRAPH_DATA%%;
+        const valleyData = graphData.valleyData;
+        const nodeLevels = graphData.nodeLevels; // This can be null
 
         const options = {
             layout: {
@@ -42,7 +44,7 @@
             edges: { arrows: 'to' }
         };
 
-        function drawNetwork(data) {
+        function drawNetwork(data, levels) {
             if (!data || !data.reservoirs || !data.units) {
                 if (network) network.setData({ nodes: [], edges: [] });
                 return;
@@ -50,43 +52,32 @@
             try {
                 const nodes = new vis.DataSet();
                 const edges = new vis.DataSet();
-                const nodeLevels = {};
 
-                const turbineDownstream = new Set(data.units.filter(u => u.type === 'turbine').map(u => u.downstream_reservoir));
-                data.reservoirs.forEach(r => {
-                    if (!turbineDownstream.has(r.name)) {
-                        nodeLevels[r.name] = 0;
-                    }
-                });
+                // Use server-provided levels if available
+                if (levels) {
+                    data.reservoirs.forEach(r => {
+                        nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF', level: levels[r.name] });
+                    });
 
-                const maxIterations = data.reservoirs.length + data.units.length;
-                for (let i = 0; i < maxIterations; i++) {
-                    data.units.forEach(unit => {
-                        const upLevel = nodeLevels[unit.upstream_reservoir];
-                        if (upLevel !== undefined) {
-                            const newUnitLevel = upLevel + 1;
-                            if (nodeLevels[unit.name] === undefined || newUnitLevel > nodeLevels[unit.name]) {
-                                nodeLevels[unit.name] = newUnitLevel;
-                            }
-                            const newDownstreamLevel = newUnitLevel + 1;
-                            if (nodeLevels[unit.downstream_reservoir] === undefined || newDownstreamLevel > nodeLevels[unit.downstream_reservoir]) {
-                                nodeLevels[unit.downstream_reservoir] = newDownstreamLevel;
-                            }
-                        }
+                    data.units.forEach(u => {
+                        nodes.add({
+                            id: u.name, label: u.name, shape: 'dot', size: 20,
+                            color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
+                            level: levels[u.name]
+                        });
+                    });
+                } else {
+                    // Fallback if no levels are provided (e.g., before first simulation)
+                    data.reservoirs.forEach(r => {
+                        nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF' });
+                    });
+                    data.units.forEach(u => {
+                        nodes.add({ id: u.name, label: u.name, shape: 'dot', size: 20, color: u.type === 'turbine' ? '#4CAF50' : '#F44336' });
                     });
                 }
 
-                data.reservoirs.forEach(r => {
-                    nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF', level: nodeLevels[r.name] });
-                });
 
                 data.units.forEach(u => {
-                    nodes.add({
-                        id: u.name, label: u.name, shape: 'dot', size: 20,
-                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
-                        level: nodeLevels[u.name]
-                    });
-
                     const isPump = u.type === 'pump';
                     const edgeOptions = {
                         smooth: { enabled: true, type: isPump ? 'curvedCCW' : 'curvedCW', roundness: 0.25 },
@@ -97,7 +88,11 @@
                 });
 
                 const networkData = { nodes, edges };
-                network = new vis.Network(container, networkData, options);
+                if (network === null) {
+                    network = new vis.Network(container, networkData, options);
+                } else {
+                    network.setData(networkData);
+                }
 
             } catch (e) {
                 console.error("Failed to draw network:", e);
@@ -106,7 +101,7 @@
         }
 
         // Draw the network when the script loads
-        drawNetwork(valleyData);
+        drawNetwork(valleyData, nodeLevels);
     </script>
 </body>
 </html>
