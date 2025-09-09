@@ -12,7 +12,8 @@ st.set_page_config(
 )
 
 # --- Constants ---
-JULIA_SERVER_URL = "http://127.0.0.1:8081/run_simulation"
+JULIA_SIMULATION_URL = "http://127.0.0.1:8081/run_simulation"
+JULIA_LAYOUT_URL = "http://127.0.0.1:8081/calculate_layout" # New endpoint
 DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), 'datasets', 'hydro_valley_instance.json')
 NETWORK_HTML_PATH = os.path.join(os.path.dirname(__file__), 'network_graph.html')
 
@@ -33,6 +34,22 @@ def load_network_html():
         st.error("Network graph HTML file not found.")
         return ""
 
+@st.cache_data
+def update_layout(_json_text):
+    """Sends JSON to the layout endpoint and returns the node levels."""
+    try:
+        valley_data = json.loads(_json_text)
+        response = requests.post(JULIA_LAYOUT_URL, json=valley_data, timeout=10)
+        response.raise_for_status()
+        response_data = response.json()
+        return response_data.get("node_levels"), None
+    except json.JSONDecodeError:
+        # Handled gracefully by the UI, return None
+        return st.session_state.get('node_levels'), None # Keep old levels on invalid JSON
+    except requests.exceptions.RequestException as e:
+        return st.session_state.get('node_levels'), f"Error connecting to Julia server for layout: {e}"
+
+
 def results_to_dataframe(results):
     return pd.DataFrame(results)
 
@@ -41,73 +58,87 @@ def convert_df_to_csv(df):
 
 # --- Main Application UI ---
 st.title("Hydro Valley Visualizer & Computer")
-st.markdown("Define your hydro valley using the JSON editor below, view the network graph, and run a simulation.")
+st.markdown("Define your hydro valley using the JSON editor below. The network graph will update in real-time.")
 
 # Initialize session state
 if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = None
 if 'node_levels' not in st.session_state:
     st.session_state.node_levels = None
+if 'json_text' not in st.session_state:
+    default_data = load_default_data()
+    st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
 
-default_data = load_default_data()
-initial_json_text = json.dumps(default_data, indent=2) if default_data else "{}"
-network_html_template = load_network_html()
-
+# --- Layout and Editor Column ---
 col1, col2 = st.columns([1, 1.5])
 
 with col1:
     st.subheader("Valley Definition (JSON)")
-    json_input = st.text_area("Edit the JSON to see the graph update.", initial_json_text, height=600)
+    st.text_area(
+        "Edit the JSON to see the graph update.",
+        value=st.session_state.json_text,
+        height=600,
+        key="json_editor_text_area"
+    )
+    # This callback ensures that when the user types, the session state is updated
+    # and the script reruns, triggering the layout update below.
+    st.session_state.json_text = st.session_state.json_editor_text_area
+
     run_button = st.button("Run Simulation")
 
+# --- Real-time Layout Update Logic ---
+node_levels, layout_error = update_layout(st.session_state.json_text)
+if layout_error:
+    st.error(layout_error)
+if node_levels:
+    st.session_state.node_levels = node_levels
+
+
+# --- Graph Display Column ---
 with col2:
     st.subheader("Valley Network Graph")
     try:
-        valley_data = json.loads(json_input)
-        # Prepare data for the HTML component
+        valley_data = json.loads(st.session_state.json_text)
         graph_data = {
             "valleyData": valley_data,
-            "nodeLevels": st.session_state.get('node_levels') # Pass levels if available
+            "nodeLevels": st.session_state.get('node_levels')
         }
+        network_html_template = load_network_html()
         network_html = network_html_template.replace("%%GRAPH_DATA%%", json.dumps(graph_data))
         components.html(network_html, height=625)
     except json.JSONDecodeError:
         st.warning("Invalid JSON. Please correct it to see the graph.")
         components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
 
+
 # --- Simulation Logic ---
 if run_button:
     try:
-        valley_data = json.loads(json_input)
+        valley_data = json.loads(st.session_state.json_text)
         with st.spinner('Running simulation...'):
-            response = requests.post(JULIA_SERVER_URL, json=valley_data, timeout=30)
+            response = requests.post(JULIA_SIMULATION_URL, json=valley_data, timeout=30)
             response.raise_for_status()
             response_data = response.json()
-            # Store both results and levels in session state
+            # The layout is no longer updated here, only simulation results
             st.session_state.simulation_results = response_data.get("volume_history")
-            st.session_state.node_levels = response_data.get("node_levels")
         st.success("Simulation completed successfully!")
-        st.rerun() # Rerun to update the graph with new levels
+        # No rerun needed, results will display automatically on the next script run
     except json.JSONDecodeError:
         st.error("Invalid JSON format. Cannot run simulation.")
     except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to Julia server: {e}")
+        st.error(f"Error connecting to Julia server for simulation: {e}")
 
 # --- Display Results ---
 if st.session_state.simulation_results:
     st.subheader("Simulation Results")
-
     results_df = results_to_dataframe(st.session_state.simulation_results)
     results_df.index.name = "Time Step"
-
     st.line_chart(results_df)
-
     st.download_button(
         label="Download Results (CSV)",
         data=convert_df_to_csv(results_df),
         file_name="simulation_results.csv",
         mime="text/csv",
     )
-
     with st.expander("View Raw Result Data"):
         st.json(st.session_state.simulation_results)

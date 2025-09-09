@@ -153,6 +153,30 @@ function topological_sort_units(reservoirs, units; upstream=false)
 end
 
 
+# Function to calculate layout for the valley graph
+function calculate_layout(req::HTTP.Request)
+    try
+        valley_data = JSON.parse(String(req.body))
+        reservoirs = valley_data["reservoirs"]
+        units = valley_data["units"]
+
+        # Calculate levels using the topological method
+        node_levels = calculate_topological_node_levels(reservoirs, units)
+
+        println("Layout calculated via /calculate_layout endpoint.")
+        flush(stdout)
+
+        response_data = Dict("node_levels" => node_levels)
+        return HTTP.Response(200, ["Content-Type" => "application/json"], body=JSON.json(response_data))
+    catch e
+        println("Error during layout calculation: $e")
+        # It's better to return a structured error response
+        error_response = Dict("error" => "Error during layout calculation: $(sprint(showerror, e))")
+        return HTTP.Response(500, ["Content-Type" => "application/json"], body=JSON.json(error_response))
+    end
+end
+
+
 # Function to run the hydro valley simulation
 function run_simulation(req::HTTP.Request)
     try
@@ -270,6 +294,7 @@ end
 
 router = HTTP.Router()
 HTTP.register!(router, "POST", "/run_simulation", run_simulation)
+HTTP.register!(router, "POST", "/calculate_layout", calculate_layout)
 
 println("Starting Julia simulation server on http://127.0.0.1:8081")
 HTTP.serve(router, "127.0.0.1", 8081)
