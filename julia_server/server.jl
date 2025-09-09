@@ -108,20 +108,46 @@ function topological_sort_units(reservoirs, units; upstream=false)
     return sorted_units
 end
 
+function generate_dot_string(reservoirs, units)
+    dot_parts = ["digraph G {"]
+
+    # Node definitions
+    for r in reservoirs
+        # DOT language requires quotes around identifiers with spaces or special chars
+        push!(dot_parts, """  "$(r["name"])" [shape=triangleDown, color="#1E90FF"];""")
+    end
+    for u in units
+        color = u["type"] == "turbine" ? "#4CAF50" : "#F44336"
+        push!(dot_parts, """  "$(u["name"])" [shape=dot, size=20, color="$color"];""")
+    end
+
+    # Edge definitions
+    for u in units
+        push!(dot_parts, """  "$(u["upstream_reservoir"])" -> "$(u["name"])";""")
+        push!(dot_parts, """  "$(u["name"])" -> "$(u["downstream_reservoir"])";""")
+    end
+
+    push!(dot_parts, "}")
+    return join(dot_parts, "\n")
+end
+
 function calculate_layout(req::HTTP.Request)
     try
         valley_data = JSON.parse(String(req.body))
         reservoirs = valley_data["reservoirs"]
         units = valley_data["units"]
-        node_levels = calculate_topological_node_levels(reservoirs, units)
-        println("Layout calculated via /calculate_layout endpoint.")
+
+        # Generate the graph representation in DOT language
+        dot_string = generate_dot_string(reservoirs, units)
+
+        println("DOT string generated via /calculate_layout endpoint.")
         flush(stdout)
-        response_data = Dict("node_levels" => node_levels)
-        return HTTP.Response(200, ["Content-Type" => "application/json"], body=JSON.json(response_data))
+
+        # Return the DOT string as plain text
+        return HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8"], body=dot_string)
     catch e
-        println("Error during layout calculation: $e")
-        error_response = Dict("error" => "Error during layout calculation: $(sprint(showerror, e))")
-        return HTTP.Response(500, ["Content-Type" => "application/json"], body=JSON.json(error_response))
+        println("Error during DOT generation: $e")
+        return HTTP.Response(500, "Error during DOT generation: $(sprint(showerror, e))")
     end
 end
 

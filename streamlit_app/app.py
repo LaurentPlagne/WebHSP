@@ -13,7 +13,7 @@ st.set_page_config(
 
 # --- Constants ---
 JULIA_SIMULATION_URL = "http://127.0.0.1:8081/run_simulation"
-JULIA_LAYOUT_URL = "http://127.0.0.1:8081/calculate_layout" # New endpoint
+JULIA_LAYOUT_URL = "http://127.0.0.1:8081/calculate_layout"
 DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), 'datasets', 'hydro_valley_instance.json')
 NETWORK_HTML_PATH = os.path.join(os.path.dirname(__file__), 'network_graph.html')
 
@@ -35,20 +35,18 @@ def load_network_html():
         return ""
 
 @st.cache_data
-def update_layout(_json_text):
-    """Sends JSON to the layout endpoint and returns the node levels."""
+def get_dot_string(_json_text):
+    """Sends JSON to the layout endpoint and returns the DOT string."""
     try:
         valley_data = json.loads(_json_text)
         response = requests.post(JULIA_LAYOUT_URL, json=valley_data, timeout=10)
         response.raise_for_status()
-        response_data = response.json()
-        return response_data.get("node_levels"), None
+        # The response is now plain text (the DOT string)
+        return response.text, None
     except json.JSONDecodeError:
-        # Handled gracefully by the UI, return None
-        return st.session_state.get('node_levels'), None # Keep old levels on invalid JSON
+        return None, None # Invalid JSON, don't update the graph
     except requests.exceptions.RequestException as e:
-        return st.session_state.get('node_levels'), f"Error connecting to Julia server for layout: {e}"
-
+        return None, f"Error connecting to Julia server: {e}"
 
 def results_to_dataframe(results):
     return pd.DataFrame(results)
@@ -63,8 +61,8 @@ st.markdown("Define your hydro valley using the JSON editor below. The network g
 # Initialize session state
 if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = None
-if 'node_levels' not in st.session_state:
-    st.session_state.node_levels = None
+if 'dot_string' not in st.session_state:
+    st.session_state.dot_string = ""
 if 'json_text' not in st.session_state:
     default_data = load_default_data()
     st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
@@ -80,36 +78,27 @@ with col1:
         height=600,
         key="json_editor_text_area"
     )
-    # This callback ensures that when the user types, the session state is updated
-    # and the script reruns, triggering the layout update below.
     st.session_state.json_text = st.session_state.json_editor_text_area
-
     run_button = st.button("Run Simulation")
 
 # --- Real-time Layout Update Logic ---
-node_levels, layout_error = update_layout(st.session_state.json_text)
+dot_string, layout_error = get_dot_string(st.session_state.json_text)
 if layout_error:
     st.error(layout_error)
-if node_levels:
-    st.session_state.node_levels = node_levels
-
+if dot_string:
+    st.session_state.dot_string = dot_string
 
 # --- Graph Display Column ---
 with col2:
     st.subheader("Valley Network Graph")
-    try:
-        valley_data = json.loads(st.session_state.json_text)
-        graph_data = {
-            "valleyData": valley_data,
-            "nodeLevels": st.session_state.get('node_levels')
-        }
+    if st.session_state.dot_string:
         network_html_template = load_network_html()
-        network_html = network_html_template.replace("%%GRAPH_DATA%%", json.dumps(graph_data))
+        # We must JSON-encode the DOT string to safely embed it in the JavaScript
+        network_html = network_html_template.replace("%%DOT_STRING%%", json.dumps(st.session_state.dot_string))
         components.html(network_html, height=625)
-    except json.JSONDecodeError:
+    else:
         st.warning("Invalid JSON. Please correct it to see the graph.")
         components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
-
 
 # --- Simulation Logic ---
 if run_button:
@@ -119,10 +108,8 @@ if run_button:
             response = requests.post(JULIA_SIMULATION_URL, json=valley_data, timeout=30)
             response.raise_for_status()
             response_data = response.json()
-            # The layout is no longer updated here, only simulation results
             st.session_state.simulation_results = response_data.get("volume_history")
         st.success("Simulation completed successfully!")
-        # No rerun needed, results will display automatically on the next script run
     except json.JSONDecodeError:
         st.error("Invalid JSON format. Cannot run simulation.")
     except requests.exceptions.RequestException as e:

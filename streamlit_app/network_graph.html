@@ -23,12 +23,8 @@
 
     <script type="text/javascript">
         const container = document.getElementById('network-graph');
-        let network = null;
 
-        // This is the data placeholder that will be replaced by Streamlit
-        const graphData = %%GRAPH_DATA%%;
-        const valleyData = graphData.valleyData;
-        const nodeLevels = graphData.nodeLevels; // This can be null
+        const dotString = %%DOT_STRING%%;
 
         const options = {
             layout: {
@@ -41,67 +37,29 @@
                 }
             },
             physics: { enabled: false },
-            edges: { arrows: 'to' }
+            edges: {
+                arrows: 'to',
+                smooth: {
+                    enabled: true,
+                    type: 'curvedCW',
+                    roundness: 0.25
+                }
+            }
         };
 
-        function drawNetwork(data, levels) {
-            if (!data || !data.reservoirs || !data.units) {
-                if (network) network.setData({ nodes: [], edges: [] });
-                return;
+        try {
+            if (dotString) {
+                // Correct function name is parseDOTNetwork
+                const parsedData = vis.parseDOTNetwork(dotString);
+
+                // create a network
+                // The parsedData contains nodes and edges. The options object enables hierarchical layout.
+                new vis.Network(container, parsedData, options);
             }
-            try {
-                const nodes = new vis.DataSet();
-                const edges = new vis.DataSet();
-
-                // Use server-provided levels if available
-                if (levels) {
-                    data.reservoirs.forEach(r => {
-                        nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF', level: levels[r.name] });
-                    });
-
-                    data.units.forEach(u => {
-                        nodes.add({
-                            id: u.name, label: u.name, shape: 'dot', size: 20,
-                            color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
-                            level: levels[u.name]
-                        });
-                    });
-                } else {
-                    // Fallback if no levels are provided (e.g., before first simulation)
-                    data.reservoirs.forEach(r => {
-                        nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF' });
-                    });
-                    data.units.forEach(u => {
-                        nodes.add({ id: u.name, label: u.name, shape: 'dot', size: 20, color: u.type === 'turbine' ? '#4CAF50' : '#F44336' });
-                    });
-                }
-
-
-                data.units.forEach(u => {
-                    const isPump = u.type === 'pump';
-                    const edgeOptions = {
-                        smooth: { enabled: true, type: isPump ? 'curvedCCW' : 'curvedCW', roundness: 0.25 },
-                    };
-
-                    edges.add({ from: u.upstream_reservoir, to: u.name, ...edgeOptions });
-                    edges.add({ from: u.name, to: u.downstream_reservoir, ...edgeOptions });
-                });
-
-                const networkData = { nodes, edges };
-                if (network === null) {
-                    network = new vis.Network(container, networkData, options);
-                } else {
-                    network.setData(networkData);
-                }
-
-            } catch (e) {
-                console.error("Failed to draw network:", e);
-                container.innerHTML = `<p style="color: red;">Error rendering graph: ${e.message}</p>`;
-            }
+        } catch (e) {
+            console.error("Failed to parse DOT string or draw network:", e);
+            container.innerHTML = `<p style="color: red;">Error rendering graph: ${e.message}</p>`;
         }
-
-        // Draw the network when the script loads
-        drawNetwork(valleyData, nodeLevels);
     </script>
 </body>
 </html>
