@@ -1,23 +1,24 @@
 #!/bin/bash
-# This script stops both the Python and Julia backend servers.
+# This script stops both the Streamlit and Julia servers.
 
-echo "Attempting to stop the Julia server..."
-# Use pkill to find and kill the process running the Julia server script.
-# The '-f' flag matches against the full command line.
-pkill -f "julia --project=julia_server julia_server/server.jl"
-if [ $? -eq 0 ]; then
-    echo "Julia server stopped."
+echo "Attempting to stop the Streamlit server..."
+# Find and kill the Streamlit process
+STREAMLIT_PID=$(pgrep -f "streamlit run streamlit_app/app.py")
+if [ -z "$STREAMLIT_PID" ]; then
+    echo "Streamlit server does not appear to be running."
 else
-    echo "Julia server not found or already stopped."
+    kill $STREAMLIT_PID
+    echo "Streamlit server (PID: $STREAMLIT_PID) stopped."
 fi
 
-echo "Attempting to stop the Python server..."
-# Use pkill to find and kill the process running the Python server script.
-pkill -f "python backend/app.py"
-if [ $? -eq 0 ]; then
-    echo "Python server stopped."
+echo "Attempting to stop the Julia server..."
+# Find and kill the Julia process
+JULIA_PID=$(pgrep -f "julia_server/server.jl")
+if [ -z "$JULIA_PID" ]; then
+    echo "Julia server does not appear to be running."
 else
-    echo "Python server not found or already stopped."
+    kill $JULIA_PID
+    echo "Julia server (PID: $JULIA_PID) stopped."
 fi
 
 echo "Cleanup complete."

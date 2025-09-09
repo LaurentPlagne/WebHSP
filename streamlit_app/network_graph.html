@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Vis Network Graph</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        html, body {
+            font-family: sans-serif;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #network-graph {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="network-graph"></div>
+
+    <script type="text/javascript">
+        const container = document.getElementById('network-graph');
+        let network = null;
+
+        // This is the data placeholder that will be replaced by Streamlit
+        const valleyData = %%VALLEY_DATA%%;
+
+        const options = {
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'directed',
+                    levelSeparation: 120,
+                    nodeSpacing: 150,
+                }
+            },
+            physics: { enabled: false },
+            edges: { arrows: 'to' }
+        };
+
+        function drawNetwork(data) {
+            if (!data || !data.reservoirs || !data.units) {
+                if (network) network.setData({ nodes: [], edges: [] });
+                return;
+            }
+            try {
+                const nodes = new vis.DataSet();
+                const edges = new vis.DataSet();
+                const nodeLevels = {};
+
+                const turbineDownstream = new Set(data.units.filter(u => u.type === 'turbine').map(u => u.downstream_reservoir));
+                data.reservoirs.forEach(r => {
+                    if (!turbineDownstream.has(r.name)) {
+                        nodeLevels[r.name] = 0;
+                    }
+                });
+
+                const maxIterations = data.reservoirs.length + data.units.length;
+                for (let i = 0; i < maxIterations; i++) {
+                    data.units.forEach(unit => {
+                        const upLevel = nodeLevels[unit.upstream_reservoir];
+                        if (upLevel !== undefined) {
+                            const newUnitLevel = upLevel + 1;
+                            if (nodeLevels[unit.name] === undefined || newUnitLevel > nodeLevels[unit.name]) {
+                                nodeLevels[unit.name] = newUnitLevel;
+                            }
+                            const newDownstreamLevel = newUnitLevel + 1;
+                            if (nodeLevels[unit.downstream_reservoir] === undefined || newDownstreamLevel > nodeLevels[unit.downstream_reservoir]) {
+                                nodeLevels[unit.downstream_reservoir] = newDownstreamLevel;
+                            }
+                        }
+                    });
+                }
+
+                data.reservoirs.forEach(r => {
+                    nodes.add({ id: r.name, label: r.name, shape: 'triangleDown', color: '#1E90FF', level: nodeLevels[r.name] });
+                });
+
+                data.units.forEach(u => {
+                    nodes.add({
+                        id: u.name, label: u.name, shape: 'dot', size: 20,
+                        color: u.type === 'turbine' ? '#4CAF50' : '#F44336',
+                        level: nodeLevels[u.name]
+                    });
+
+                    const isPump = u.type === 'pump';
+                    const edgeOptions = {
+                        smooth: { enabled: true, type: isPump ? 'curvedCCW' : 'curvedCW', roundness: 0.25 },
+                    };
+
+                    edges.add({ from: u.upstream_reservoir, to: u.name, ...edgeOptions });
+                    edges.add({ from: u.name, to: u.downstream_reservoir, ...edgeOptions });
+                });
+
+                const networkData = { nodes, edges };
+                network = new vis.Network(container, networkData, options);
+
+            } catch (e) {
+                console.error("Failed to draw network:", e);
+                container.innerHTML = `<p style="color: red;">Error rendering graph: ${e.message}</p>`;
+            }
+        }
+
+        // Draw the network when the script loads
+        drawNetwork(valleyData);
+    </script>
+</body>
+</html>
