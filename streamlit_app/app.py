@@ -87,7 +87,7 @@ if run_button:
             st.session_state.simulation_results = response_data.get("volume_history")
             st.session_state.node_levels = response_data.get("node_levels")
         st.success("Simulation completed successfully!")
-        st.experimental_rerun() # Rerun to update the graph with new levels
+        st.rerun() # Rerun to update the graph with new levels
     except json.JSONDecodeError:
         st.error("Invalid JSON format. Cannot run simulation.")
     except requests.exceptions.RequestException as e:
