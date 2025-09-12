@@ -67,38 +67,42 @@ if 'json_text' not in st.session_state:
     default_data = load_default_data()
     st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
 
-# --- Layout and Editor Column ---
-col1, col2 = st.columns([1, 1.5])
+# Create tabs
+editor_tab, results_tab = st.tabs(["Editor", "Simulation Results"])
 
-with col1:
-    st.subheader("Valley Definition (JSON)")
-    st.text_area(
-        "Edit the JSON to see the graph update.",
-        value=st.session_state.json_text,
-        height=600,
-        key="json_editor_text_area"
-    )
-    st.session_state.json_text = st.session_state.json_editor_text_area
-    run_button = st.button("Run Simulation")
+run_button = None
 
-# --- Real-time Layout Update Logic ---
-dot_string, layout_error = get_dot_string(st.session_state.json_text)
-if layout_error:
-    st.error(layout_error)
-if dot_string:
-    st.session_state.dot_string = dot_string
+with editor_tab:
+    col1, col2 = st.columns([1, 1.5])
 
-# --- Graph Display Column ---
-with col2:
-    st.subheader("Valley Network Graph")
-    if st.session_state.dot_string:
-        network_html_template = load_network_html()
-        # We must JSON-encode the DOT string to safely embed it in the JavaScript
-        network_html = network_html_template.replace("%%DOT_STRING%%", json.dumps(st.session_state.dot_string))
-        components.html(network_html, height=625)
-    else:
-        st.warning("Invalid JSON. Please correct it to see the graph.")
-        components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
+    with col1:
+        st.subheader("Valley Definition (JSON)")
+        st.text_area(
+            "Edit the JSON to see the graph update.",
+            value=st.session_state.json_text,
+            height=600,
+            key="json_editor_text_area"
+        )
+        st.session_state.json_text = st.session_state.json_editor_text_area
+        run_button = st.button("Run Simulation")
+
+    # --- Real-time Layout Update Logic ---
+    dot_string, layout_error = get_dot_string(st.session_state.json_text)
+    if layout_error:
+        st.error(layout_error)
+    if dot_string:
+        st.session_state.dot_string = dot_string
+
+    with col2:
+        st.subheader("Valley Network Graph")
+        if st.session_state.dot_string:
+            network_html_template = load_network_html()
+            # We must JSON-encode the DOT string to safely embed it in the JavaScript
+            network_html = network_html_template.replace("%%DOT_STRING%%", json.dumps(st.session_state.dot_string))
+            components.html(network_html, height=625)
+        else:
+            st.warning("Invalid JSON. Please correct it to see the graph.")
+            components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
 
 # --- Simulation Logic ---
 if run_button:
@@ -109,23 +113,25 @@ if run_button:
             response.raise_for_status()
             response_data = response.json()
             st.session_state.simulation_results = response_data.get("volume_history")
-        st.success("Simulation completed successfully!")
+        st.success("Simulation completed successfully! Check the 'Simulation Results' tab.")
     except json.JSONDecodeError:
         st.error("Invalid JSON format. Cannot run simulation.")
     except requests.exceptions.RequestException as e:
         st.error(f"Error connecting to Julia server for simulation: {e}")
 
-# --- Display Results ---
-if st.session_state.simulation_results:
+with results_tab:
     st.subheader("Simulation Results")
-    results_df = results_to_dataframe(st.session_state.simulation_results)
-    results_df.index.name = "Time Step"
-    st.line_chart(results_df)
-    st.download_button(
-        label="Download Results (CSV)",
-        data=convert_df_to_csv(results_df),
-        file_name="simulation_results.csv",
-        mime="text/csv",
-    )
-    with st.expander("View Raw Result Data"):
-        st.json(st.session_state.simulation_results)
+    if st.session_state.simulation_results:
+        results_df = results_to_dataframe(st.session_state.simulation_results)
+        results_df.index.name = "Time Step"
+        st.line_chart(results_df)
+        st.download_button(
+            label="Download Results (CSV)",
+            data=convert_df_to_csv(results_df),
+            file_name="simulation_results.csv",
+            mime="text/csv",
+        )
+        with st.expander("View Raw Result Data"):
+            st.json(st.session_state.simulation_results)
+    else:
+        st.info("Click 'Run Simulation' in the 'Editor' tab to see results here.")
