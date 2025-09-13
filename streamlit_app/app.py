@@ -68,9 +68,7 @@ if 'json_text' not in st.session_state:
     st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
 
 # Create tabs
-editor_tab, results_tab = st.tabs(["Editor", "Simulation Results"])
-
-run_button = None
+editor_tab, simulation_tab = st.tabs(["Editor", "Simulation"])
 
 with editor_tab:
     col1, col2 = st.columns([1, 1.5])
@@ -84,7 +82,6 @@ with editor_tab:
             key="json_editor_text_area"
         )
         st.session_state.json_text = st.session_state.json_editor_text_area
-        run_button = st.button("Run Simulation")
 
     # --- Real-time Layout Update Logic ---
     dot_string, layout_error = get_dot_string(st.session_state.json_text)
@@ -104,23 +101,22 @@ with editor_tab:
             st.warning("Invalid JSON. Please correct it to see the graph.")
             components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
 
-# --- Simulation Logic ---
-if run_button:
-    try:
-        valley_data = json.loads(st.session_state.json_text)
-        with st.spinner('Running simulation...'):
-            response = requests.post(JULIA_SIMULATION_URL, json=valley_data, timeout=30)
-            response.raise_for_status()
-            response_data = response.json()
-            st.session_state.simulation_results = response_data.get("volume_history")
-        st.success("Simulation completed successfully! Check the 'Simulation Results' tab.")
-    except json.JSONDecodeError:
-        st.error("Invalid JSON format. Cannot run simulation.")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to Julia server for simulation: {e}")
+with simulation_tab:
+    st.subheader("Simulation")
+    if st.button("Launch simulation"):
+        try:
+            valley_data = json.loads(st.session_state.json_text)
+            with st.spinner('Running simulation...'):
+                response = requests.post(JULIA_SIMULATION_URL, json=valley_data, timeout=30)
+                response.raise_for_status()
+                response_data = response.json()
+                st.session_state.simulation_results = response_data.get("volume_history")
+            st.success("Simulation completed successfully!")
+        except json.JSONDecodeError:
+            st.error("Invalid JSON format. Cannot run simulation.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error connecting to Julia server for simulation: {e}")
 
-with results_tab:
-    st.subheader("Simulation Results")
     if st.session_state.simulation_results:
         results_df = results_to_dataframe(st.session_state.simulation_results)
         results_df.index.name = "Time Step"
@@ -134,4 +130,4 @@ with results_tab:
         with st.expander("View Raw Result Data"):
             st.json(st.session_state.simulation_results)
     else:
-        st.info("Click 'Run Simulation' in the 'Editor' tab to see results here.")
+        st.info("Click 'Launch simulation' to see results here.")
