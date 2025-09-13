@@ -1,14 +1,14 @@
 #!/bin/bash
-# This script stops both the Streamlit and Julia servers.
+# This script stops both the ExtJS frontend and Julia servers.
 
-echo "Attempting to stop the Streamlit server..."
-# Find and kill the Streamlit process
-STREAMLIT_PID=$(pgrep -f "streamlit run streamlit_app/app.py")
-if [ -z "$STREAMLIT_PID" ]; then
-    echo "Streamlit server does not appear to be running."
+echo "Attempting to stop the ExtJS frontend server..."
+# Find and kill the Python HTTP server process
+EXTJS_PID=$(pgrep -f "python3 -m http.server --directory extjs_app 8000")
+if [ -z "$EXTJS_PID" ]; then
+    echo "ExtJS server does not appear to be running."
 else
-    kill $STREAMLIT_PID
-    echo "Streamlit server (PID: $STREAMLIT_PID) stopped."
+    kill $EXTJS_PID
+    echo "ExtJS server (PID: $EXTJS_PID) stopped."
 fi
 
 echo "Attempting to stop the Julia server..."
