@@ -2,8 +2,10 @@ using HTTP
 using JSON
 using Random
 
+# --- Business Logic Functions (unchanged) ---
+
 function calculate_topological_node_levels(reservoirs, units)
-    # --- Part 1: Calculate base ranks of reservoirs from turbine-based graph ---
+    # ... (implementation from before)
     reservoir_to_idx = Dict{String, Int}(r["name"] => i for (i, r) in enumerate(reservoirs))
     num_reservoirs = length(reservoirs)
     adj = zeros(Int, num_reservoirs, num_reservoirs)
@@ -30,8 +32,6 @@ function calculate_topological_node_levels(reservoirs, units)
         return rk
     end
     for i in 1:num_reservoirs; calculate_rank(adj, i); end
-
-    # --- Part 2: Assign levels directly based on ranks ---
     node_levels = Dict{String, Int}()
     for (i, r) in enumerate(reservoirs)
         node_levels[r["name"]] = (reservoir_ranks[i] - 1) * 2
@@ -41,8 +41,6 @@ function calculate_topological_node_levels(reservoirs, units)
             node_levels[unit["name"]] = node_levels[unit["upstream_reservoir"]] + 1
         end
     end
-
-    # --- Part 3: Ensure all nodes have a level to prevent rendering errors ---
     for r in reservoirs
         if !haskey(node_levels, r["name"])
             node_levels[r["name"]] = 0
@@ -53,14 +51,13 @@ function calculate_topological_node_levels(reservoirs, units)
             node_levels[u["name"]] = 0
         end
     end
-
     return node_levels
 end
 
 function topological_sort_units(reservoirs, units; upstream=false)
+    # ... (implementation from before)
     reservoir_to_idx = Dict{String, Int}(r["name"] => i for (i, r) in enumerate(reservoirs))
     num_reservoirs = length(reservoirs)
-
     adj = zeros(Int, num_reservoirs, num_reservoirs)
     for unit in filter(u -> u["type"] == "turbine", units)
         if haskey(reservoir_to_idx, unit["downstream_reservoir"]) && haskey(reservoir_to_idx, unit["upstream_reservoir"])
@@ -69,7 +66,6 @@ function topological_sort_units(reservoirs, units; upstream=false)
             adj[downstream_idx, upstream_idx] = 1
         end
     end
-
     ranks = zeros(Int, num_reservoirs)
     function calculate_rank(adj_matrix, r_idx)
         if ranks[r_idx] > 0
@@ -87,79 +83,65 @@ function topological_sort_units(reservoirs, units; upstream=false)
         ranks[r_idx] = rk
         return rk
     end
-
     adj_matrix_to_use = upstream ? transpose(adj) : adj
     for i in 1:num_reservoirs
         calculate_rank(adj_matrix_to_use, i)
     end
-
     sorted_units = sort(
         units,
         by = u -> get(ranks, get(reservoir_to_idx, u["upstream_reservoir"], 0), 0)
     )
-
     println("Topologically sorted units ($(upstream ? "upstream" : "downstream")): ")
     for u in sorted_units
         rank_val = get(ranks, get(reservoir_to_idx, u["upstream_reservoir"], 0), 0)
         println("- $(u["name"]) (Rank: $rank_val)")
     end
     flush(stdout)
-
     return sorted_units
 end
 
 function generate_dot_string(reservoirs, units)
+    # ... (implementation from before)
     dot_parts = ["digraph G {"]
-
-    # Node definitions
     for r in reservoirs
-        # DOT language requires quotes around identifiers with spaces or special chars
         push!(dot_parts, """  "$(r["name"])" [shape=triangleDown, color="#1E90FF"];""")
     end
     for u in units
         color = u["type"] == "turbine" ? "#4CAF50" : "#F44336"
         push!(dot_parts, """  "$(u["name"])" [shape=dot, size=20, color="$color"];""")
     end
-
-    # Edge definitions
     for u in units
         push!(dot_parts, """  "$(u["upstream_reservoir"])" -> "$(u["name"])";""")
         push!(dot_parts, """  "$(u["name"])" -> "$(u["downstream_reservoir"])";""")
     end
-
     push!(dot_parts, "}")
     return join(dot_parts, "\n")
 end
 
-function calculate_layout(req::HTTP.Request)
+# --- Endpoint Handlers ---
+
+function calculate_layout_handler(req::HTTP.Request)
     try
         valley_data = JSON.parse(String(req.body))
-        reservoirs = valley_data["reservoirs"]
-        units = valley_data["units"]
-
-        # Generate the graph representation in DOT language
-        dot_string = generate_dot_string(reservoirs, units)
-
+        dot_string = generate_dot_string(valley_data["reservoirs"], valley_data["units"])
         println("DOT string generated via /calculate_layout endpoint.")
         flush(stdout)
-
-        # Return the DOT string as plain text
-        return HTTP.Response(200, ["Content-Type" => "text/plain; charset=utf-8"], body=dot_string)
+        return HTTP.Response(200, body=dot_string)
     catch e
         println("Error during DOT generation: $e")
         return HTTP.Response(500, "Error during DOT generation: $(sprint(showerror, e))")
     end
 end
 
-function run_simulation(req::HTTP.Request)
+function run_simulation_handler(req::HTTP.Request)
     try
         valley_data = JSON.parse(String(req.body))
+        # ... (rest of the simulation logic is complex, so just copying it)
         num_timesteps = valley_data["time_horizon"]["num_timesteps"]
         timestep_hours = valley_data["time_horizon"]["timestep_hours"]
         units = valley_data["units"]
         reservoirs = valley_data["reservoirs"]
         m3s_to_Mm3_per_step = (3600 * timestep_hours) / 1_000_000
-
         conflicts = Dict()
         for (i, unit1) in enumerate(units)
             for j in (i+1):length(units)
@@ -171,13 +153,11 @@ function run_simulation(req::HTTP.Request)
                 end
             end
         end
-
         reservoir_volumes = Dict{String, Float64}(r["name"] => r["initial_volume_M_m3"] for r in reservoirs)
         volume_history = Dict{String, Vector{Float64}}(r["name"] => [r["initial_volume_M_m3"]] for r in reservoirs)
         reservoir_map = Dict{String, Any}(r["name"] => r for r in reservoirs)
         node_levels = calculate_topological_node_levels(reservoirs, units)
         sorted_units = topological_sort_units(reservoirs, units)
-
         for t in 1:num_timesteps
             chosen_flows = Dict{String, Float64}()
             for unit in units
@@ -185,7 +165,6 @@ function run_simulation(req::HTTP.Request)
                 chosen_level = rand(power_levels)
                 chosen_flows[unit["name"]] = chosen_level["flow_rate_m3_s"]
             end
-
             for (unit1_name, unit2_name) in conflicts
                 if chosen_flows[unit1_name] > 0 && chosen_flows[unit2_name] > 0
                     if rand() < 0.5
@@ -195,7 +174,6 @@ function run_simulation(req::HTTP.Request)
                     end
                 end
             end
-
             for unit in sorted_units
                 flow_rate_m3_s = chosen_flows[unit["name"]]
                 if flow_rate_m3_s > 0
@@ -218,16 +196,11 @@ function run_simulation(req::HTTP.Request)
                     end
                 end
             end
-
             for r_name in keys(volume_history)
                 push!(volume_history[r_name], reservoir_volumes[r_name])
             end
         end
-
-        response_data = Dict(
-            "volume_history" => volume_history,
-            "node_levels" => node_levels
-        )
+        response_data = Dict("volume_history" => volume_history, "node_levels" => node_levels)
         return HTTP.Response(200, ["Content-Type" => "application/json"], body=JSON.json(response_data))
     catch e
         println("Error during simulation: $e")
@@ -238,9 +211,35 @@ function run_simulation(req::HTTP.Request)
     end
 end
 
-router = HTTP.Router()
-HTTP.register!(router, "POST", "/run_simulation", run_simulation)
-HTTP.register!(router, "POST", "/calculate_layout", calculate_layout)
+# --- Main Server Handler with CORS ---
 
+const ROUTER = HTTP.Router()
+
+# Register POST handlers
+HTTP.register!(ROUTER, "POST", "/calculate_layout", calculate_layout_handler)
+HTTP.register!(ROUTER, "POST", "/run_simulation", run_simulation_handler)
+
+function cors_layer(handler)
+    return function(req::HTTP.Request)
+        # Handle CORS preflight request
+        if HTTP.method(req) == "OPTIONS"
+            return HTTP.Response(200, [
+                "Access-Control-Allow-Origin" => "*",
+                "Access-Control-Allow-Headers" => "Content-Type",
+                "Access-Control-Allow-Methods" => "POST, OPTIONS",
+            ])
+        end
+
+        # Handle actual request
+        response = handler(req)
+
+        # Add CORS header to the response
+        HTTP.addheader!(response, "Access-Control-Allow-Origin" => "*")
+
+        return response
+    end
+end
+
+# --- Start Server ---
 println("Starting Julia simulation server on http://127.0.0.1:8081")
-HTTP.serve(router, "127.0.0.1", 8081)
+HTTP.serve(cors_layer(ROUTER), "127.0.0.1", 8081)
