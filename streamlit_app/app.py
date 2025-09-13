@@ -3,7 +3,8 @@ import requests
 import json
 import pandas as pd
 import os
-import streamlit.components.v1 as components
+from streamlit_agraph import agraph, Node, Edge, Config
+import pydot
 
 # --- App Configuration ---
 st.set_page_config(
@@ -15,7 +16,6 @@ st.set_page_config(
 JULIA_SIMULATION_URL = "http://127.0.0.1:8081/run_simulation"
 JULIA_LAYOUT_URL = "http://127.0.0.1:8081/calculate_layout"
 DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), 'datasets', 'hydro_valley_instance.json')
-NETWORK_HTML_PATH = os.path.join(os.path.dirname(__file__), 'network_graph.html')
 
 # --- Helper Functions ---
 def load_default_data():
@@ -25,14 +25,6 @@ def load_default_data():
     except (FileNotFoundError, json.JSONDecodeError) as e:
         st.error(f"Error loading default data: {e}")
         return {}
-
-def load_network_html():
-    try:
-        with open(NETWORK_HTML_PATH, 'r') as f:
-            return f.read()
-    except FileNotFoundError:
-        st.error("Network graph HTML file not found.")
-        return ""
 
 @st.cache_data
 def get_dot_string(_json_text):
@@ -66,12 +58,14 @@ if 'dot_string' not in st.session_state:
 if 'json_text' not in st.session_state:
     default_data = load_default_data()
     st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
+if 'selected_node' not in st.session_state:
+    st.session_state.selected_node = None
 
 # Create tabs
 editor_tab, simulation_tab = st.tabs(["Editor", "Simulation"])
 
 with editor_tab:
-    col1, col2 = st.columns([1, 1.5])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
 
     with col1:
         st.subheader("Valley Definition (JSON)")
@@ -93,13 +87,75 @@ with editor_tab:
     with col2:
         st.subheader("Valley Network Graph")
         if st.session_state.dot_string:
-            network_html_template = load_network_html()
-            # We must JSON-encode the DOT string to safely embed it in the JavaScript
-            network_html = network_html_template.replace("%%DOT_STRING%%", json.dumps(st.session_state.dot_string))
-            components.html(network_html, height=625)
+            try:
+                # Get data from JSON
+                valley_data = json.loads(st.session_state.json_text)
+                entity_info = {}
+
+                for r in valley_data.get("reservoirs", []):
+                    connections = [t["name"] for t in valley_data.get("turbines", []) if t.get("reservoir") == r["name"]]
+                    entity_info[r["name"]] = {"kind": "Reservoir", "connections": ", ".join(connections)}
+
+                for t in valley_data.get("turbines", []):
+                    entity_info[t["name"]] = {"kind": "Turbine", "connections": t.get("reservoir", "N/A")}
+
+                for j in valley_data.get("junctions", []):
+                    # Connections for junctions are not straightforward from the provided data structure.
+                    # This part may need to be revisited if more detailed connection info is required.
+                    entity_info[j["name"]] = {"kind": "Junction", "connections": "N/A"}
+
+                graphs = pydot.graph_from_dot_data(st.session_state.dot_string)
+                graph = graphs[0]
+                nodes = []
+                edges = []
+                for pydot_node in graph.get_nodes():
+                    node_id = pydot_node.get_name().strip('"')
+                    node_label = pydot_node.get_label().strip('"') if pydot_node.get_label() else node_id
+                    info = entity_info.get(node_id, {"kind": "N/A", "connections": "N/A"})
+                    title = f"Name: {node_id}\nKind: {info['kind']}\nConnections: {info['connections']}"
+                    nodes.append(Node(id=node_id,
+                                      label=node_label,
+                                      title=title))
+                for pydot_edge in graph.get_edges():
+                    edges.append(Edge(source=pydot_edge.get_source().strip('"'),
+                                      target=pydot_edge.get_destination().strip('"')))
+
+                config = Config(width=600,
+                                height=625,
+                                directed=True,
+                                physics=False,
+                                hierarchical=True,
+                                )
+
+                node_id = agraph(nodes=nodes, edges=edges, config=config)
+                if node_id:
+                    st.session_state.selected_node = node_id
+            except Exception as e:
+                st.error(f"Error rendering graph: {e}")
         else:
             st.warning("Invalid JSON. Please correct it to see the graph.")
-            components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
+
+    with col3:
+        st.subheader("Details")
+        selected_node = st.session_state.get("selected_node")
+        if selected_node:
+            st.write(f"**Selected:** {selected_node}")
+
+            # Display simulation data if available
+            if st.session_state.get("simulation_results"):
+                if selected_node in st.session_state.simulation_results:
+                    volume_data = st.session_state.simulation_results[selected_node]
+                    df = pd.DataFrame({
+                        "Metric": ["Min Volume", "Max Volume"],
+                        "Value": [min(volume_data), max(volume_data)]
+                    })
+                    st.table(df)
+                else:
+                    st.info("No simulation data available for this entity.")
+            else:
+                st.info("Run a simulation to see detailed data.")
+        else:
+            st.info("Hover over a node in the graph to see details.")
 
 with simulation_tab:
     st.subheader("Simulation")
