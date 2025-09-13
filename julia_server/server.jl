@@ -238,9 +238,34 @@ function run_simulation(req::HTTP.Request)
     end
 end
 
+# --- CORS Middleware ---
+const CORS_HEADERS = [
+    "Access-Control-Allow-Origin" => "*",
+    "Access-Control-Allow-Headers" => "Content-Type",
+    "Access-Control-Allow-Methods" => "POST, OPTIONS",
+]
+
+function cors_middleware(handler)
+    return function(req::HTTP.Request)
+        if HTTP.method(req) == "OPTIONS"
+            return HTTP.Response(200, CORS_HEADERS)
+        else
+            response = handler(req)
+            for (key, value) in CORS_HEADERS
+                HTTP.setheader(response, key, value)
+            end
+            return response
+        end
+    end
+end
+
+# --- Router Setup ---
 router = HTTP.Router()
 HTTP.register!(router, "POST", "/run_simulation", run_simulation)
 HTTP.register!(router, "POST", "/calculate_layout", calculate_layout)
 
+# Wrap the router with the CORS middleware
+const app = cors_middleware(router)
+
 println("Starting Julia simulation server on http://127.0.0.1:8081")
-HTTP.serve(router, "127.0.0.1", 8081)
+HTTP.serve(app, "127.0.0.1", 8081)

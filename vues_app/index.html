@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hydro Valley Visualizer (Vue)</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hpcc-js/wasm@2/dist/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-graphviz@5/build/d3-graphviz.js"></script>
+    <style>
+        body {
+            padding: 2rem;
+        }
+        .columns {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 2rem;
+        }
+        #network-graph, #results-chart-container {
+            height: 625px;
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+        textarea {
+            height: 600px;
+            font-family: monospace;
+        }
+        .error {
+            color: red;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <main class="container">
+            <h1 style="text-align: center;">Hydro Valley Visualizer & Computer</h1>
+            <p style="text-align: center;">Define your hydro valley using the JSON editor below. The network graph will update in real-time.</p>
+
+            <div v-if="error" class="error">
+                <strong>Error:</strong> {{ error }}
+            </div>
+
+            <article>
+                <header>
+                    <nav>
+                        <ul>
+                            <li><a href="#" @click.prevent="current_tab = 'editor'" :class="{ 'secondary': current_tab !== 'editor' }">Editor</a></li>
+                            <li><a href="#" @click.prevent="current_tab = 'results'" :class="{ 'secondary': current_tab !== 'results' }">Simulation Results</a></li>
+                        </ul>
+                    </nav>
+                </header>
+
+                <!-- Editor Tab -->
+                <div v-show="current_tab === 'editor'" class="columns">
+                    <section>
+                        <h3>Valley Definition (JSON)</h3>
+                        <textarea v-model="json_text" @input="debounced_get_layout"></textarea>
+                        <button @click="run_simulation" :aria-busy="loading_simulation">Run Simulation</button>
+                    </section>
+                    <section>
+                        <h3>Valley Network Graph</h3>
+                        <div id="network-graph"></div>
+                    </section>
+                </div>
+
+                <!-- Results Tab -->
+                <div v-show="current_tab === 'results'">
+                     <h3>Simulation Results</h3>
+                     <div id="results-chart-container">
+                        <canvas id="results-chart"></canvas>
+                     </div>
+                     <div v-if="simulation_results">
+                        <button @click="download_csv">Download Results (CSV)</button>
+                     </div>
+                     <div v-else>
+                         <p>Click 'Run Simulation' in the 'Editor' tab to see results here.</p>
+                     </div>
+                </div>
+            </article>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, watch } = Vue;
+
+        const app = createApp({
+            setup() {
+                // --- Refs for reactive data ---
+                const json_text = ref('');
+                const dot_string = ref('');
+                const simulation_results = ref(null);
+                const current_tab = ref('editor');
+                const error = ref(null);
+                const loading_simulation = ref(false);
+                let chart = null;
+                let debounce_timer = null;
+
+                // --- API URLs ---
+                const JULIA_BASE_URL = "http://127.0.0.1:8081";
+                const LAYOUT_URL = `${JULIA_BASE_URL}/calculate_layout`;
+                const SIMULATION_URL = `${JULIA_BASE_URL}/run_simulation`;
+
+                // --- Methods ---
+                const get_layout = async () => {
+                    try {
+                        const response = await axios.post(LAYOUT_URL, JSON.parse(json_text.value));
+                        dot_string.value = response.data;
+                        error.value = null;
+                    } catch (e) {
+                        console.error("Layout error:", e);
+                        error.value = "Failed to get layout. Check JSON validity and server status.";
+                        dot_string.value = ''; // Clear graph on error
+                    }
+                };
+
+                const debounced_get_layout = () => {
+                    clearTimeout(debounce_timer);
+                    debounce_timer = setTimeout(get_layout, 500);
+                };
+
+                const run_simulation = async () => {
+                    loading_simulation.value = true;
+                    error.value = null;
+                    try {
+                        const response = await axios.post(SIMULATION_URL, JSON.parse(json_text.value));
+                        simulation_results.value = response.data.volume_history;
+                        current_tab.value = 'results';
+                    } catch (e) {
+                        console.error("Simulation error:", e);
+                        error.value = "Failed to run simulation. Check server status.";
+                    } finally {
+                        loading_simulation.value = false;
+                    }
+                };
+
+                const render_graph = (dot) => {
+                    if (!dot) {
+                        document.getElementById('network-graph').innerHTML = '<p>Enter valid JSON to see the graph.</p>';
+                        return;
+                    }
+                    try {
+                        d3.select("#network-graph").graphviz({ useWorker: false }).renderDot(dot);
+                    } catch(e) {
+                        console.error("Graph rendering error:", e);
+                        error.value = "Failed to render graph from DOT string.";
+                    }
+                };
+
+                const render_chart = (data) => {
+                    if (!data) return;
+                    const ctx = document.getElementById('results-chart').getContext('2d');
+                    const labels = data[Object.keys(data)[0]].map((_, i) => `T${i}`);
+                    const datasets = Object.keys(data).map(reservoir => ({
+                        label: reservoir,
+                        data: data[reservoir],
+                        fill: false,
+                        tension: 0.1
+                    }));
+
+                    if (chart) {
+                        chart.destroy();
+                    }
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels, datasets },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                };
+
+                const download_csv = () => {
+                    const data = simulation_results.value;
+                    if (!data) return;
+
+                    const time_steps = data[Object.keys(data)[0]].length;
+                    let csv_content = "Time Step," + Object.keys(data).join(",") + "\\n";
+
+                    for (let i = 0; i < time_steps; i++) {
+                        let row = `T${i}`;
+                        for (const reservoir in data) {
+                            row += `,${data[reservoir][i]}`;
+                        }
+                        csv_content += row + "\\n";
+                    }
+
+                    const blob = new Blob([csv_content], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", "simulation_results.csv");
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
+
+                // --- Lifecycle and Watchers ---
+                onMounted(async () => {
+                    // Load default data like the original app
+                    try {
+                        const response = await axios.get('/datasets/hydro_valley_instance.json');
+                        json_text.value = JSON.stringify(response.data, null, 2);
+                        get_layout();
+                    } catch (e) {
+                        console.error("Failed to load default data:", e);
+                        error.value = "Could not load initial dataset.";
+                        json_text.value = '{}';
+                    }
+                });
+
+                watch(dot_string, (new_dot) => render_graph(new_dot));
+                watch(simulation_results, (new_results) => {
+                    if (new_results) {
+                        render_chart(new_results)
+                    }
+                });
+
+                return {
+                    json_text,
+                    dot_string,
+                    simulation_results,
+                    current_tab,
+                    error,
+                    loading_simulation,
+                    debounced_get_layout,
+                    run_simulation,
+                    download_csv
+                };
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+</html>
