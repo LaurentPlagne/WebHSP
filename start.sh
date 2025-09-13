@@ -5,12 +5,13 @@ echo "Installing Python dependencies for the Streamlit app..."
 pip install -r streamlit_app/requirements.txt
 
 echo "Instantiating Julia environment..."
-/home/jules/.juliaup/bin/julia --project=julia_server -e 'import Pkg; Pkg.instantiate()'
+# Ensure that the 'julia' executable is in your system's PATH.
+julia --project=julia_server -e 'import Pkg; Pkg.instantiate()'
 
 echo "Starting Julia server in the background..."
 # Run the Julia server, activating the project environment in its directory
 # Redirect stdout and stderr to a log file.
-/home/jules/.juliaup/bin/julia --project=julia_server julia_server/server.jl > julia_server.log 2>&1 &
+julia --project=julia_server julia_server/server.jl > julia_server.log 2>&1 &
 JULIA_PID=$!
 echo "Julia server started with PID: $JULIA_PID"
 
