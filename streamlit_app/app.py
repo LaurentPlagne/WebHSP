@@ -58,12 +58,11 @@ if 'dot_string' not in st.session_state:
 if 'json_text' not in st.session_state:
     default_data = load_default_data()
     st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
-
-# Create tabs
-editor_tab, simulation_tab = st.tabs(["Editor", "Simulation"])
-
 if 'selected_node' not in st.session_state:
     st.session_state.selected_node = None
+
+# --- UI Tabs ---
+editor_tab, simulation_tab = st.tabs(["Editor", "Simulation"])
 
 with editor_tab:
     col1, col2, col3 = st.columns([1, 1.5, 1])
@@ -78,131 +77,89 @@ with editor_tab:
         )
         st.session_state.json_text = st.session_state.json_editor_text_area
 
-    # --- Real-time Layout Update Logic ---
-    dot_string, layout_error = get_dot_string(st.session_state.json_text)
-    if layout_error:
-        st.error(layout_error)
-    if dot_string:
-        st.session_state.dot_string = dot_string
+    # --- Graph and Details Logic ---
+    valley_data = json.loads(st.session_state.json_text)
+    entity_info = {}
+    nodes = []
+    edges = []
+
+    # Process reservoirs
+    for r in valley_data.get("reservoirs", []):
+        entity_info[r["name"]] = {"kind": "Reservoir", "data": r}
+        nodes.append(Node(id=r["name"], label=r["name"], shape='box', color='#ADD8E6'))
+
+    # Process units (turbines and pumps)
+    for unit in valley_data.get("units", []):
+        unit_type = unit.get("type", "N/A").capitalize()
+        entity_info[unit["name"]] = {"kind": unit_type, "data": unit}
+        color = "#90EE90" if unit_type == "Turbine" else "#FFB6C1"
+        nodes.append(Node(id=unit["name"], label=unit["name"], shape='dot', color=color))
+        # Add edges
+        if unit.get("upstream_reservoir"):
+            edges.append(Edge(source=unit["upstream_reservoir"], target=unit["name"]))
+        if unit.get("downstream_reservoir"):
+            edges.append(Edge(source=unit["name"], target=unit["downstream_reservoir"]))
+
+    # Process junctions
+    for j in valley_data.get("junctions", []):
+        entity_info[j["name"]] = {"kind": "Junction", "data": j}
+        nodes.append(Node(id=j["name"], label=j["name"], shape='diamond', color='#D3D3D3'))
+        # Add edges for junctions if connection info is available
+        # This part is left as a potential extension as connection info for junctions is not in the sample JSON.
+
+    # Update tooltips
+    for node in nodes:
+        info = entity_info.get(node.id, {"kind": "N/A", "data": {}})
+        connections = "N/A"
+        if info["kind"] == "Reservoir":
+            connections_list = [u["name"] for u in valley_data.get("units", []) if u.get("upstream_reservoir") == node.id or u.get("downstream_reservoir") == node.id]
+            connections = ", ".join(connections_list)
+        elif info["kind"] in ["Turbine", "Pump"]:
+            connections = f"Upstream: {info['data'].get('upstream_reservoir', 'N/A')}, Downstream: {info['data'].get('downstream_reservoir', 'N/A')}"
+        node.title = f"Name: {node.id}\nKind: {info['kind']}\nConnections: {connections}"
+
 
     with col2:
         st.subheader("Valley Network Graph")
-        if st.session_state.dot_string:
-            try:
-                # Get data from JSON
-                valley_data = json.loads(st.session_state.json_text)
-                entity_info = {}
-                node_shapes = {}
-                node_colors = {}
-
-                for r in valley_data.get("reservoirs", []):
-                    entity_info[r["name"]] = {"kind": "Reservoir", "data": r}
-                    node_shapes[r["name"]] = "box"
-                    node_colors[r["name"]] = "#ADD8E6"
-
-                for t in valley_data.get("turbines", []):
-                    entity_info[t["name"]] = {"kind": "Turbine", "data": t}
-                    node_shapes[t["name"]] = "dot"
-                    node_colors[t["name"]] = "#90EE90"
-
-                for p in valley_data.get("pumps", []):
-                    entity_info[p["name"]] = {"kind": "Pump", "data": p}
-                    node_shapes[p["name"]] = "dot"
-                    node_colors[p["name"]] = "#FFB6C1"
-
-                for j in valley_data.get("junctions", []):
-                    entity_info[j["name"]] = {"kind": "Junction", "data": j}
-                    node_shapes[j["name"]] = "diamond"
-                    node_colors[j["name"]] = "#D3D3D3"
-
-
-                graphs = pydot.graph_from_dot_data(st.session_state.dot_string)
-                graph = graphs[0]
-                nodes = []
-                edges = []
-                for pydot_node in graph.get_nodes():
-                    node_id = pydot_node.get_name().strip('"')
-                    node_label = pydot_node.get_label().strip('"') if pydot_node.get_label() else node_id
-                    info = entity_info.get(node_id, {"kind": "N/A", "data": {}})
-
-                    connections = "N/A"
-                    if info["kind"] == "Reservoir":
-                        connections_list = [t["name"] for t in valley_data.get("turbines", []) if t.get("reservoir") == node_id]
-                        connections_list.extend([p["name"] for p in valley_data.get("pumps", []) if p.get("downstream_reservoir") == node_id])
-                        connections = ", ".join(connections_list)
-                    elif info["kind"] in ["Turbine", "Pump"]:
-                        connections = f"Upstream: {info['data'].get('upstream_reservoir', 'N/A')}, Downstream: {info['data'].get('downstream_reservoir', 'N/A')}"
-
-                    title = f"Name: {node_id}\nKind: {info['kind']}\nConnections: {connections}"
-
-                    nodes.append(Node(id=node_id,
-                                      label=node_label,
-                                      title=title,
-                                      shape=node_shapes.get(node_id, "dot"),
-                                      color=node_colors.get(node_id, "#D3D3D3")))
-                for pydot_edge in graph.get_edges():
-                    edges.append(Edge(source=pydot_edge.get_source().strip('"'),
-                                      target=pydot_edge.get_destination().strip('"')))
-
-                config = Config(width=600,
-                                height=625,
-                                directed=True,
-                                physics=False,
-                                hierarchical=True,
-                                )
-
-                node_id = agraph(nodes=nodes, edges=edges, config=config)
-                if node_id:
-                    st.session_state.selected_node = node_id
-            except Exception as e:
-                st.error(f"Error rendering graph: {e}")
-        else:
-            st.warning("Invalid JSON. Please correct it to see the graph.")
+        config = Config(width=600,
+                        height=625,
+                        directed=True,
+                        physics=False,
+                        hierarchical=True)
+        node_id = agraph(nodes=nodes, edges=edges, config=config)
+        if node_id:
+            st.session_state.selected_node = node_id
 
     with col3:
         st.subheader("Details")
         selected_node_id = st.session_state.get("selected_node")
-        if selected_node_id:
-            valley_data = json.loads(st.session_state.json_text)
-            entity_info = {}
-            for r in valley_data.get("reservoirs", []):
-                entity_info[r["name"]] = {"kind": "Reservoir", "data": r}
-            for t in valley_data.get("turbines", []):
-                entity_info[t["name"]] = {"kind": "Turbine", "data": t}
-            for p in valley_data.get("pumps", []):
-                entity_info[p["name"]] = {"kind": "Pump", "data": p}
-            for j in valley_data.get("junctions", []):
-                entity_info[j["name"]] = {"kind": "Junction", "data": j}
-
+        if selected_node_id and selected_node_id in entity_info:
             st.write(f"**Selected:** {selected_node_id}")
-
-            info = entity_info.get(selected_node_id, {"kind": "N/A", "data": {}})
+            info = entity_info[selected_node_id]
             data = info["data"]
 
             if info["kind"] == "Reservoir":
-                st.table(pd.DataFrame({
-                    "Metric": ["Min Volume", "Max Volume", "Cost"],
-                    "Value": [data.get("min_volume"), data.get("max_volume"), data.get("cost")]
-                }))
+                df = pd.DataFrame({
+                    'Min Volume': data.get('min_volume_M_m3', []),
+                    'Max Volume': data.get('max_volume_M_m3', [])
+                })
+                st.write("Volume Time Series (M_m3):")
+                st.table(df)
             elif info["kind"] in ["Turbine", "Pump"]:
-                st.table(pd.DataFrame({
-                    "Metric": ["Power Max", "Power Min"],
-                    "Value": [data.get("power_max"), data.get("power_min")]
-                }))
+                st.write("Power Levels:")
+                st.table(pd.DataFrame(data.get("power_levels", [])))
             else:
                 st.info("No details available for this entity.")
-
         else:
             st.info("Hover over a node in the graph to see details.")
-
 
 with simulation_tab:
     st.subheader("Simulation")
     if st.button("Launch simulation"):
         try:
-            valley_data = json.loads(st.session_state.json_text)
+            valley_data_sim = json.loads(st.session_state.json_text)
             with st.spinner('Running simulation...'):
-                response = requests.post(JULIA_SIMULATION_URL, json=valley_data, timeout=30)
+                response = requests.post(JULIA_SIMULATION_URL, json=valley_data_sim, timeout=30)
                 response.raise_for_status()
                 response_data = response.json()
                 st.session_state.simulation_results = response_data.get("volume_history")
