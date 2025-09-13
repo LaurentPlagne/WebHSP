@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Vis Network Graph</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <title>d3-graphviz Network Graph</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://unpkg.com/@hpcc-js/wasm@0.3.11/dist/index.min.js"></script>
+    <script src="https://unpkg.com/d3-graphviz@3.0.5/build/d3-graphviz.js"></script>
     <style>
         html, body {
             font-family: sans-serif;
@@ -11,6 +13,9 @@
             height: 100%;
             margin: 0;
             padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #network-graph {
             width: 100%;
@@ -23,41 +28,16 @@
 
     <script type="text/javascript">
         const container = document.getElementById('network-graph');
-
         const dotString = %%DOT_STRING%%;
-
-        const options = {
-            layout: {
-                hierarchical: {
-                    enabled: true,
-                    direction: 'UD',
-                    sortMethod: 'directed',
-                    levelSeparation: 120,
-                    nodeSpacing: 150,
-                }
-            },
-            physics: { enabled: false },
-            edges: {
-                arrows: 'to',
-                smooth: {
-                    enabled: true,
-                    type: 'curvedCW',
-                    roundness: 0.25
-                }
-            }
-        };
 
         try {
             if (dotString) {
-                // Correct function name is parseDOTNetwork
-                const parsedData = vis.parseDOTNetwork(dotString);
-
-                // create a network
-                // The parsedData contains nodes and edges. The options object enables hierarchical layout.
-                new vis.Network(container, parsedData, options);
+                d3.select("#network-graph")
+                    .graphviz()
+                    .renderDot(dotString);
             }
         } catch (e) {
-            console.error("Failed to parse DOT string or draw network:", e);
+            console.error("Failed to render graph with d3-graphviz:", e);
             container.innerHTML = `<p style="color: red;">Error rendering graph: ${e.message}</p>`;
         }
     </script>
