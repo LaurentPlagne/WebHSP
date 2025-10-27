@@ -135,7 +135,7 @@ function calculate_layout(req::HTTP.Request)
     try
         valley_data = JSON.parse(String(req.body))
         reservoirs = valley_data["reservoirs"]
-        units = valley_data["units"]
+        units = valley_data["usines"]
 
         # Generate the graph representation in DOT language
         dot_string = generate_dot_string(reservoirs, units)
@@ -156,7 +156,7 @@ function run_simulation(req::HTTP.Request)
         valley_data = JSON.parse(String(req.body))
         num_timesteps = valley_data["time_horizon"]["num_timesteps"]
         timestep_hours = valley_data["time_horizon"]["timestep_hours"]
-        units = valley_data["units"]
+        units = valley_data["usines"]
         reservoirs = valley_data["reservoirs"]
         m3s_to_Mm3_per_step = (3600 * timestep_hours) / 1_000_000
 
