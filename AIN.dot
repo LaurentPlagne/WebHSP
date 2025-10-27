@@ -1,0 +1,45 @@
+digraph Vallee {
+
+// HydraulicData #1
+  node [margin=0.1, fontcolor=black, fontsize=10, width=0.05];
+
+  // Reservoirs
+  node [shape=rectangle, fontcolor=blue, style=filled, fillcolor=aliceblue];
+  hd1_r1 [ label="r1: BOLOZR", ];
+  hd1_r2 [ label="r2: ALLEMR", ];
+  hd1_r3 [ label="r3: COISER", ];
+  hd1_r4 [ label="r4: MOUX R", ];
+  hd1_r5 [ label="r5: S.MORR", ];
+  hd1_r6 [ label="r6: VOUGLR", ];
+  hd1_r7 [ label="r7: CUSSER", style="filled,dashed", color=green, ];
+  hd1_r8 [ label="r8: SINK", ];
+
+  // Usines
+  node [shape=circle, fontcolor=black, style="filled,solid"];
+  hd1_u1 [ label="u1: VOUGLP", fillcolor=white, color=red, ];
+  hd1_u2 [ label="u2: VOUGLH", fillcolor=white, ];
+  hd1_u3 [ label="u3: MOUX H", fillcolor=white, ];
+  hd1_u4 [ label="u4: S.MORH", fillcolor=white, ];
+  hd1_u5 [ label="u5: COISEH", fillcolor=white, ];
+  hd1_u6 [ label="u6: BOLOZH", fillcolor=white, ];
+  hd1_u7 [ label="u7: ALLEMH", fillcolor=white, ];
+  hd1_u8 [ label="u8: CUSSEH", fillcolor=white, color=green, style="filled,dashed", ];
+  
+  // Edges
+  hd1_r6 -> hd1_u1 [ color=red, dir=back, ];
+  hd1_u1 -> hd1_r5 [ color=red, dir=back, ];
+  hd1_r6 -> hd1_u2 [ ];
+  hd1_u2 -> hd1_r5 [ ];
+  hd1_r4 -> hd1_u3 [ ];
+  hd1_u3 -> hd1_r1 [ ];
+  hd1_r5 -> hd1_u4 [ ];
+  hd1_u4 -> hd1_r3 [  label = " Δ↓=1 " ];
+  hd1_r3 -> hd1_u5 [ ];
+  hd1_u5 -> hd1_r1 [  label = " Δ↓=1 " ];
+  hd1_r1 -> hd1_u6 [ ];
+  hd1_u6 -> hd1_r2 [  label = " Δ↓=1 " ];
+  hd1_r2 -> hd1_u7 [ ];
+  hd1_u7 -> hd1_r7 [  label = " Δ↓=18 " ];
+  hd1_r7 -> hd1_u8 [ ];
+  hd1_u8 -> hd1_r8 [ ];
+}
