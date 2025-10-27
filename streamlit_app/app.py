@@ -14,16 +14,23 @@ st.set_page_config(
 # --- Constants ---
 JULIA_SIMULATION_URL = "http://127.0.0.1:8081/run_simulation"
 JULIA_LAYOUT_URL = "http://127.0.0.1:8081/calculate_layout"
-DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), 'datasets', 'hydro_valley_instance.json')
+EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), '..', 'examples')
 NETWORK_HTML_PATH = os.path.join(os.path.dirname(__file__), 'network_graph.html')
 
 # --- Helper Functions ---
-def load_default_data():
+def get_example_files():
+    """Returns a list of hd_xxx.json files from the examples directory."""
+    if not os.path.exists(EXAMPLES_DIR):
+        return []
+    return [f for f in os.listdir(EXAMPLES_DIR) if f.startswith('hd_') and f.endswith('.json')]
+
+def load_example_data(filename):
+    """Loads a specific JSON file from the examples directory."""
     try:
-        with open(DATA_FILE_PATH, 'r') as f:
+        with open(os.path.join(EXAMPLES_DIR, filename), 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        st.error(f"Error loading default data: {e}")
+        st.error(f"Error loading example file {filename}: {e}")
         return {}
 
 def load_network_html():
@@ -56,7 +63,7 @@ def convert_df_to_csv(df):
 
 # --- Main Application UI ---
 st.title("Hydro Valley Visualizer & Computer")
-st.markdown("Define your hydro valley using the JSON editor below. The network graph will update in real-time.")
+st.markdown("Load a valley description from the sidebar, or paste your own JSON into the editor. The network graph will update in real-time.")
 
 # Initialize session state
 if 'simulation_results' not in st.session_state:
@@ -64,11 +71,44 @@ if 'simulation_results' not in st.session_state:
 if 'dot_string' not in st.session_state:
     st.session_state.dot_string = ""
 if 'json_text' not in st.session_state:
-    default_data = load_default_data()
-    st.session_state.json_text = json.dumps(default_data, indent=2) if default_data else "{}"
+    st.session_state.json_text = "{}"
+if 'current_example' not in st.session_state:
+    st.session_state.current_example = None
 
+# --- UI for Loading Data ---
+st.sidebar.title("Data Loader")
+example_files = get_example_files()
+
+selected_example = st.sidebar.selectbox(
+    "Choose an example valley:",
+    [""] + example_files, # Add a blank option
+    index=0
+)
+
+uploaded_file = st.sidebar.file_uploader(
+    "Or upload your own JSON file:",
+    type=['json']
+)
+
+# --- Data Loading Logic ---
+if uploaded_file is not None:
+    try:
+        # Clear the example selection if a file is uploaded
+        st.session_state.current_example = None
+        json_data = json.load(uploaded_file)
+        st.session_state.json_text = json.dumps(json_data, indent=2)
+        st.sidebar.success("File uploaded successfully!")
+    except json.JSONDecodeError:
+        st.sidebar.error("Invalid JSON file.")
+elif selected_example and st.session_state.current_example != selected_example:
+    # Load the example if a new one is selected
+    st.session_state.current_example = selected_example
+    example_data = load_example_data(selected_example)
+    st.session_state.json_text = json.dumps(example_data, indent=2)
+
+# --- Main App Layout ---
 # Create tabs
-editor_tab, results_tab = st.tabs(["Editor", "Simulation Results"])
+editor_tab, explorer_tab, results_tab = st.tabs(["Editor", "JSON Explorer", "Simulation Results"])
 
 run_button = None
 
@@ -83,7 +123,7 @@ with editor_tab:
             height=600,
             key="json_editor_text_area"
         )
-        st.session_state.json_text = st.session_state.json_editor_text_area
+        st.session_state.json_text = st.session_state.json_editor_text_area # Update session state on every interaction
         run_button = st.button("Run Simulation")
 
     # --- Real-time Layout Update Logic ---
@@ -103,6 +143,14 @@ with editor_tab:
         else:
             st.warning("Invalid JSON. Please correct it to see the graph.")
             components.html("<div>Enter valid JSON to render the graph.</div>", height=625)
+
+with explorer_tab:
+    st.subheader("Explore the Valley Data")
+    try:
+        json_data = json.loads(st.session_state.json_text)
+        st.json(json_data)
+    except json.JSONDecodeError:
+        st.warning("Invalid JSON format. Please fix it in the 'Editor' tab.")
 
 # --- Simulation Logic ---
 if run_button:
