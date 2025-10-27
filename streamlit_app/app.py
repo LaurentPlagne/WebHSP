@@ -70,19 +70,28 @@ if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = None
 if 'dot_string' not in st.session_state:
     st.session_state.dot_string = ""
-if 'json_text' not in st.session_state:
-    st.session_state.json_text = "{}"
 if 'current_example' not in st.session_state:
-    st.session_state.current_example = None
+    st.session_state.current_example = "hd_ROSELEND.json" # Default value
+if 'json_text' not in st.session_state:
+    # Load the default example when the app starts
+    example_data = load_example_data(st.session_state.current_example)
+    st.session_state.json_text = json.dumps(example_data, indent=2) if example_data else "{}"
 
 # --- UI for Loading Data ---
 st.sidebar.title("Data Loader")
 example_files = get_example_files()
 
+# Determine the index for the default selection
+options = [""] + example_files
+try:
+    default_index = options.index(st.session_state.current_example)
+except ValueError:
+    default_index = 0 # Fallback to blank
+
 selected_example = st.sidebar.selectbox(
     "Choose an example valley:",
-    [""] + example_files, # Add a blank option
-    index=0
+    options,
+    index=default_index
 )
 
 uploaded_file = st.sidebar.file_uploader(
