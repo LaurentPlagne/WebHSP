@@ -48,10 +48,9 @@ def get_dot_string(_json_text):
         valley_data = json.loads(_json_text)
         response = requests.post(JULIA_LAYOUT_URL, json=valley_data, timeout=10)
         response.raise_for_status()
-        # The response is now plain text (the DOT string)
         return response.text, None
     except json.JSONDecodeError:
-        return None, None # Invalid JSON, don't update the graph
+        return None, None
     except requests.exceptions.RequestException as e:
         return None, f"Error connecting to Julia server: {e}"
 
@@ -70,53 +69,45 @@ if 'simulation_results' not in st.session_state:
     st.session_state.simulation_results = None
 if 'dot_string' not in st.session_state:
     st.session_state.dot_string = ""
-if 'current_example' not in st.session_state:
-    st.session_state.current_example = "hd_ROSELEND.json" # Default value
 if 'json_text' not in st.session_state:
-    # Load the default example when the app starts
-    example_data = load_example_data(st.session_state.current_example)
+    example_data = load_example_data("hd_ROSELEND.json")
     st.session_state.json_text = json.dumps(example_data, indent=2) if example_data else "{}"
 
 # --- UI for Loading Data ---
 st.sidebar.title("Data Loader")
 example_files = get_example_files()
-
-# Determine the index for the default selection
 options = [""] + example_files
 try:
-    default_index = options.index(st.session_state.current_example)
+    default_index = options.index("hd_ROSELEND.json")
 except ValueError:
-    default_index = 0 # Fallback to blank
+    default_index = 0
 
 selected_example = st.sidebar.selectbox(
     "Choose an example valley:",
     options,
-    index=default_index
+    index=default_index,
+    key='example_selector'
 )
 
 uploaded_file = st.sidebar.file_uploader(
     "Or upload your own JSON file:",
-    type=['json']
+    type=['json'],
+    key='file_uploader'
 )
 
 # --- Data Loading Logic ---
 if uploaded_file is not None:
     try:
-        # Clear the example selection if a file is uploaded
-        st.session_state.current_example = None
         json_data = json.load(uploaded_file)
         st.session_state.json_text = json.dumps(json_data, indent=2)
         st.sidebar.success("File uploaded successfully!")
     except json.JSONDecodeError:
         st.sidebar.error("Invalid JSON file.")
-elif selected_example and st.session_state.current_example != selected_example:
-    # Load the example if a new one is selected
-    st.session_state.current_example = selected_example
+elif selected_example:
     example_data = load_example_data(selected_example)
     st.session_state.json_text = json.dumps(example_data, indent=2)
 
 # --- Main App Layout ---
-# Create tabs
 editor_tab, explorer_tab, results_tab = st.tabs(["Editor", "JSON Explorer", "Simulation Results"])
 
 run_button = None
@@ -126,13 +117,15 @@ with editor_tab:
 
     with col1:
         st.subheader("Valley Definition (JSON)")
-        st.text_area(
+        new_json_text = st.text_area(
             "Edit the JSON to see the graph update.",
             value=st.session_state.json_text,
             height=600,
-            key="json_editor_text_area"
         )
-        st.session_state.json_text = st.session_state.json_editor_text_area # Update session state on every interaction
+        if new_json_text != st.session_state.json_text:
+            st.session_state.json_text = new_json_text
+            st.experimental_rerun()
+
         run_button = st.button("Run Simulation")
 
     # --- Real-time Layout Update Logic ---
@@ -146,7 +139,6 @@ with editor_tab:
         st.subheader("Valley Network Graph")
         if st.session_state.dot_string:
             network_html_template = load_network_html()
-            # We must JSON-encode the DOT string to safely embed it in the JavaScript
             network_html = network_html_template.replace("%%DOT_STRING%%", json.dumps(st.session_state.dot_string))
             components.html(network_html, height=625)
         else:
