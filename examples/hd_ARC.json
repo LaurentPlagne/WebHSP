@@ -1093,6 +1093,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -1130,6 +1131,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "pump",
       "kind": "Pump",
       "gradient_up_serie": [
         {
@@ -1186,6 +1188,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -1631,6 +1634,7 @@
         "trend": "increase",
         "duration": 1050
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -2292,6 +2296,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "pump",
       "kind": "Pump",
       "pdf_serie": {
         "pdfs_table": [
@@ -2329,6 +2334,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -2403,6 +2409,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -4223,6 +4230,7 @@
         "trend": "decrease",
         "duration": 120
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -4537,6 +4545,7 @@
         "trend": "decrease",
         "duration": 60
       },
+      "type": "river_dam",
       "kind": "RiverDam",
       "pdf_serie": {
         "pdfs_table": [
@@ -4988,6 +4997,7 @@
         "trend": "increase",
         "duration": 600
       },
+      "type": "turbine",
       "kind": "Turbine",
       "gradient_up_serie": [
         {
@@ -5515,6 +5525,7 @@
         "trend": "increase",
         "duration": 600
       },
+      "type": "river_dam",
       "kind": "RiverDam",
       "pdf_serie": {
         "pdfs_table": [
@@ -5564,6 +5575,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "river_dam",
       "kind": "RiverDam",
       "pdf_serie": {
         "pdfs_table": [
@@ -5602,6 +5614,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -5639,6 +5652,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -5731,6 +5745,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "pump",
       "kind": "Pump",
       "gradient_down_serie": [
         {
@@ -5789,6 +5804,7 @@
         "trend": "decrease",
         "duration": 30
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -5862,6 +5878,7 @@
         "trend": "increase",
         "duration": 660
       },
+      "type": "turbine",
       "kind": "Turbine",
       "gradient_up_serie": [
         {
@@ -6152,6 +6169,7 @@
         "trend": "increase",
         "duration": 360
       },
+      "type": "river_dam",
       "kind": "RiverDam",
       "pdf_serie": {
         "pdfs_table": [

@@ -92,6 +92,7 @@
         "trend": "increase",
         "duration": 1020
       },
+      "type": "pump",
       "kind": "Pump",
       "pdf_serie": {
         "pdfs_table": [
@@ -142,6 +143,7 @@
         "trend": "decrease",
         "duration": 180
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
@@ -1199,6 +1201,7 @@
         "trend": "steady",
         "duration": 1440
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [

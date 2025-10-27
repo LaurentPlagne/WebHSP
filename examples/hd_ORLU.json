@@ -63,6 +63,7 @@
         "trend": "decrease",
         "duration": 150
       },
+      "type": "turbine",
       "kind": "Turbine",
       "pdf_serie": {
         "pdfs_table": [
